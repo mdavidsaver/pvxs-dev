@@ -105,7 +105,7 @@ struct Run {
 
 MAIN(testxput)
 {
-    testPlan(28);
+    testPlan(39);
 
     auto pvI32(server::SharedPV::buildMailbox());
     pvI32.open(nt::NTScalar{TypeCode::Int32}.create()
@@ -202,11 +202,26 @@ MAIN(testxput)
     testEq(pvS.fetch()["value"].as<std::string>(), "baz");
 
 
+    Run({"testE", "hello"}).exitWith(1); // invalid choice
+    testEq(pvE.fetch()["value.index"].as<int32_t>(), 0);
+
+    Run({"testE", "two"}).success();
+    testEq(pvE.fetch()["value.index"].as<int32_t>(), 1);
+
+    Run({"testE", "0"}).success();
+    testEq(pvE.fetch()["value.index"].as<int32_t>(), 0);
+
+    Run({"testE", "42"}).success(); // can set arbitrary index
+    testEq(pvE.fetch()["value.index"].as<int32_t>(), 42);
+
     Run({"testE", R"({"value":{"index":1, "choices":["A","B","C"]}})"}).success();
     testEq(pvE.fetch()["value.index"].as<int32_t>(), 1);
+    Run({"testE", "C"}).success();
+    testEq(pvE.fetch()["value.index"].as<int32_t>(), 2);
 
     // update choices and assign from string with one op.  A place where order matters...
     Run({"testE", R"({"value":"d", "value.choices":["a","b","c","d"]})"}).exitWith(1);
+    Run({"testE", R"({"value.choices":["x","y","z","q"], "value":"x"})"}).success();
 
     return testDone();
 }
