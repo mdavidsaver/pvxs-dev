@@ -68,6 +68,7 @@ struct PVXS_API UDPManager
         decltype (names)::const_iterator end() const   { return names.end(); }
 
         virtual bool reply(const void *msg, size_t msglen) const =0;
+        virtual bool replyTo(const SockAddr& dst, const void *msg, size_t msglen) const =0;
         virtual ~Search();
     };
     //! Create subscription for Search messages.

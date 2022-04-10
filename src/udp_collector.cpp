@@ -86,7 +86,8 @@ struct UDPCollector : public UDPManager::Search,
 
     // Search interface
 public:
-    virtual bool reply(const void *msg, size_t msglen) const override;
+    virtual bool reply(const void *msg, size_t msglen) const override final;
+    virtual bool replyTo(const SockAddr& dst, const void *msg, size_t msglen) const override final;
 };
 
 
@@ -466,19 +467,24 @@ void UDPCollector::forwardM(const SockAddr& origin, const uint8_t *pbuf, size_t 
 
 bool UDPCollector::reply(const void *msg, size_t msglen) const
 {
+    return replyTo(src, msg, msglen);
+}
+
+bool UDPCollector::replyTo(const SockAddr& dst, const void *msg, size_t msglen) const
+{
     manager->loop.assertInLoop();
 
     log_hex_printf(logio, Level::Debug, msg, msglen, "Send %s -> %s\n",
-                   bind_addr.tostring().c_str(), src.tostring().c_str());
+                   bind_addr.tostring().c_str(), dst.tostring().c_str());
 
-    auto ntx = sendto(sock.sock, (char*)msg, msglen, 0, &src->sa, src.size());
+    auto ntx = sendto(sock.sock, (char*)msg, msglen, 0, &dst->sa, dst.size());
     if(ntx<0) {
         int err = evutil_socket_geterror(sock.sock);
         if(err==SOCK_EWOULDBLOCK || err==EAGAIN || err==SOCK_EINTR) {
             // nothing to do here
         } else {
             log_warn_printf(logio, "UDP TX Error on %s -> %s : (%d) %s\n",
-                            name.c_str(), src.tostring().c_str(),
+                            name.c_str(), dst.tostring().c_str(),
                             err, evutil_socket_error_to_string(err));
         }
         return false; // wait for more I/O
