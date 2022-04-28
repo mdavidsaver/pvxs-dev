@@ -38,6 +38,27 @@
 
 #include "pvxsVCS.h"
 
+#if GCC_VERSION>=VERSION_INT(4,0,0,0) && __ELF__
+/* Include some info. about this build in a way which should
+ * be included in dependent executables when statically linked.
+ */
+static
+__attribute__((used, section(".note.pvxs.version")))
+const struct {
+    uint8_t fmt =0;
+    uint8_t rsrv=0;
+    uint16_t ord = 0x1234;
+    uint32_t api =PVXS_VERSION;
+    uint32_t base =EPICS_VERSION_INT;
+    uint32_t event=LIBEVENT_VERSION_NUMBER;
+#ifdef PVXS_VCS_VERSION
+    const char vcs[sizeof(PVXS_VCS_VERSION)] = PVXS_VCS_VERSION;
+#else
+    const char vcs[1] = "";
+#endif
+} pvxs_version_info = {};
+#endif
+
 extern "C" {
 // unofficial helpers for dynamic loading
 PVXS_API
