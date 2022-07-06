@@ -217,6 +217,8 @@ struct TypeCode {
     bool    isunsigned() const  { return code&0x04; }
     //! For all
     bool    isarray() const { return code&0x08; }
+    //! Shorthand for kind() of Bool, Integer, or Real
+    bool    ispod() const { return kind()==Kind::Bool || kind()==Kind::Real || kind()==Kind::Real;}
 
     constexpr TypeCode() :code(Null) {}
     constexpr explicit TypeCode(uint8_t c) :code(code_t(c)) {}
