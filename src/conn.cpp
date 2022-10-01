@@ -147,6 +147,8 @@ void ConnBase::bevRead()
     auto rx = bufferevent_get_input(bev.get());
     auto remaining = evbuffer_get_length(rx);
 
+    STAP_PROBE1(pvxs, cliread, remaining);
+
     while(bev && remaining >= 8) {
         uint8_t header[8];
 

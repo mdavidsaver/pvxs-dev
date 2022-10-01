@@ -26,6 +26,18 @@
 #include <type_traits>
 #include <limits>
 
+/* Auto-detect systemtap user-space probe points
+ */
+#ifdef __has_include
+#  if __has_include(<sys/sdt.h>)
+#    include <sys/sdt.h>
+#  endif
+#endif
+#ifndef STAP_PROBE
+#  define STAP_PROBE(PROV, NAME) while(0) { }
+#  define STAP_PROBE1(PROV, NAME, A) while(0) { (void)A; }
+#endif
+
 #include <event2/util.h>
 
 #include <compilerDependencies.h>
