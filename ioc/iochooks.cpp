@@ -21,6 +21,10 @@
 #include <epicsExit.h>
 #include <epicsExport.h>
 
+#if EPICS_VERSION_INT >= VERSION_INT(7, 0, 4, 0)
+#  define USE_DEINIT_HOOKS
+#endif
+
 using namespace pvxs;
 
 namespace {
@@ -194,10 +198,12 @@ void pvxsInitHook(initHookState state)
         if(state==initHookAfterCaLinkInit) {
 
         }
+#ifndef USE_DEINIT_HOOKS
         if(state==initHookAfterInitDatabase) {
             // we want to run before exitDatabase
             epicsAtExit(&pvxsAtExit, nullptr);
         }
+#endif
         // iocRun()/iocPause()
         if(state==initHookAfterCaServerRunning) {
             if(auto serv = gblSrv.load()) {
@@ -214,6 +220,12 @@ void pvxsInitHook(initHookState state)
                 log_debug_printf(log, "Stopped Server %p", serv);
             }
         }
+#ifdef USE_DEINIT_HOOKS
+        // iocShutdown()  (called from exitDatabase() at exit, and testIocShutdownOk() )
+        if(state==initHookAtShutdown) {
+            pvxsAtExit(nullptr);
+        }
+#endif
     } catch(std::exception& e) {
         fprintf(stderr, "Error in %s : %s\n", __func__, e.what());
     }
