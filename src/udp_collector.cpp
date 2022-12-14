@@ -316,7 +316,9 @@ void UDPCollector::process_one(const SockAddr &dest, const uint8_t *buf, size_t 
         }
         server.setPort(port);
 
-        if(M.good() && origin==Loopback && (flags&pva_search_flags::Unicast) && dest.family()==AF_INET) {
+        if(!M.good() || !(flags&pva_search_flags::Unicast) || dest.family()!=AF_INET) {
+
+        } else if(origin==Remote) {
             assert(buf==&this->buf[cmd_origin_tag_size]);
             // clear unicast flag in forwarded message
             *save_flags &= ~pva_search_flags::Unicast;
@@ -328,6 +330,13 @@ void UDPCollector::process_one(const SockAddr &dest, const uint8_t *buf, size_t 
             }
             forwardM(dest, buf, nrx);
             return;
+
+        } else {
+            /* refuse to re-forward.  Also, if received via. localhost as
+             * some PVA implementations don't prefix forwarded messages with CMD_ORIGIN_TAG
+             */
+            log_debug_printf(logio, "Ignore as originated for %s\n",
+                             dest.tostring().c_str());
         }
 
         // so far, only "tcp" transport has ever been seen.
