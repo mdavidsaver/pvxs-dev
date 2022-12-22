@@ -389,7 +389,7 @@ Server::Pvt::Pvt(const Config &conf)
 
     beaconSender4.set_broadcast(true);
 
-    auto manager = UDPManager::instance();
+    auto manager = UDPManager::instance(effective.shareUDP());
 
     evsocket dummy(AF_INET, SOCK_DGRAM, 0);
 
