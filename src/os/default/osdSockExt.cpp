@@ -292,6 +292,15 @@ decltype (IfaceMap::Current::byIndex) IfaceMap::_refresh() {
                 it = pair.first;
             }
 
+            if(af==AF_INET6) {
+                auto addr6 = (sockaddr_in6*)&ifa->ifa_addr;
+                // link local must have scope (aka. interface index) to disambiguate.
+                // others ipv6 addresses assumed to be unambiguous.
+                if(IN6_IS_ADDR_LINKLOCAL(&addr6->sin6_addr) && addr6->sin6_scope_id==0) {
+                    addr6->sin6_scope_id = idx;
+                }
+            }
+
             // IFF_BROADCAST does not apply to IPv6
             bool hasB = af==AF_INET && (ifa->ifa_flags&IFF_BROADCAST) && ifa->ifa_broadaddr;
 
