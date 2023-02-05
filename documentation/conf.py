@@ -54,6 +54,7 @@ release = read_version('{PVXS_MAJOR_VERSION}.{PVXS_MINOR_VERSION}.{PVXS_MAINTENA
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.githubpages',
+    'sphinx.ext.graphviz',
     'breathe',
 ]
 
