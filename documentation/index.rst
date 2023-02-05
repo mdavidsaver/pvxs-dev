@@ -39,6 +39,7 @@ See :ref:`relpolicy` for details.
    :caption: Contents:
 
    overview
+   guide
    netconfig
    example
    building
