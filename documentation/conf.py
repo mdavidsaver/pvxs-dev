@@ -71,6 +71,7 @@ today = git_date()
 extensions = [
     'sphinx.ext.autodoc',
     'sphinx.ext.githubpages',
+    'sphinx.ext.graphviz',
     'breathe',
 ]
 

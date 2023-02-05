@@ -44,6 +44,7 @@ Contents
    :maxdepth: 3
 
    overview
+   guide
    netconfig
    example
    building
