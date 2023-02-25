@@ -31,8 +31,8 @@ namespace pvxs {namespace impl {
 DEFINE_LOGGER(logio, "pvxs.udp.io");
 DEFINE_LOGGER(logsetup, "pvxs.udp.setup");
 
-struct UDPCollector : public UDPManager::Search,
-                      public std::enable_shared_from_this<UDPCollector>
+struct UDPCollector final : public UDPManager::Search,
+                            public std::enable_shared_from_this<UDPCollector>
 {
     UDPManager::Pvt* const manager;
     SockAddr bind_addr; // address our socket is bound to
@@ -86,7 +86,7 @@ struct UDPCollector : public UDPManager::Search,
 
     // Search interface
 public:
-    virtual bool reply(const void *msg, size_t msglen) const override;
+    virtual bool reply(const void *msg, size_t msglen) const override final;
 };
 
 
