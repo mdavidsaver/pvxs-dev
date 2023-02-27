@@ -26,7 +26,7 @@ public:
             :pvxs::server::Server(config) {
     }
 
-    GroupMap groupMap;
+    std::map<std::string, Group> groupMap;
     std::list<std::string> groupConfigFiles;
 
     // For locking access to groupMap

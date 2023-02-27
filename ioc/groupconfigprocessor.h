@@ -53,7 +53,7 @@ class GroupConfigProcessor {
     };
 
 public:
-    GroupConfigMap groupConfigMap;
+    std::map<std::string, GroupConfig> groupConfigMap;
 
     // Group processing warning messages if not empty
     std::string groupProcessingWarnings;

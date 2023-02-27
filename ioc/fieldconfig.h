@@ -26,8 +26,6 @@ public:
     int64_t putOrder;
 };
 
-typedef std::map<std::string, FieldConfig> FieldConfigMap;
-
 } // pvxs
 } // ioc
 

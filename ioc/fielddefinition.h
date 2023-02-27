@@ -42,9 +42,6 @@ public:
     }
 };
 
-typedef std::vector<FieldDefinition> FieldDefinitions;
-typedef std::map<std::string, size_t> FieldDefinitionMap;
-
 } // pvxs
 } // ioc
 #endif //PVXS_FIELDDEFINITION_H

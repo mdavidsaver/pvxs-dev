@@ -33,7 +33,7 @@ public:
     const std::string name;
     const bool atomicPutGet;
     const bool atomicMonitor;
-    Fields fields;
+    std::vector<Field> fields;
     Value valueTemplate;
     ChannelLocks value;
     ChannelLocks properties;
@@ -48,9 +48,6 @@ public:
     {}
     Group(const Group&) = delete;
 };
-
-// A map of group name to Group
-typedef std::map<std::string, Group> GroupMap;
 
 } // pvxs
 } // ioc

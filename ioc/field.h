@@ -26,7 +26,6 @@ namespace pvxs {
 namespace ioc {
 
 class Field;
-typedef std::vector<Field*> Triggers;
 
 class ChannelAndLock {
 public:
@@ -50,15 +49,13 @@ public:
     bool isArray = false;
     ChannelAndLock value;
     ChannelAndLock properties;
-    Triggers triggers;          // reference to the fields that are triggered by this field during subscriptions
+    std::vector<Field*> triggers;          // reference to the fields that are triggered by this field during subscriptions
 
     Field(const std::string& stringFieldName, const std::string& stringChannelName, const std::string& id);
     Field(const Field&) = delete;
     Field(Field&&) = default;
     Value findIn(Value valueTarget) const;
 };
-
-typedef std::vector<Field> Fields;
 
 } // pvxs
 } // ioc
