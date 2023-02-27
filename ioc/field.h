@@ -46,13 +46,15 @@ public:
     std::string name;
     FieldName fieldName;
     std::string fullName;
-    bool isMeta, allowProc;
-    bool isArray;
+    bool isMeta = false, allowProc = false;
+    bool isArray = false;
     ChannelAndLock value;
     ChannelAndLock properties;
     Triggers triggers;          // reference to the fields that are triggered by this field during subscriptions
 
-    Field(const std::string& stringFieldName, const std::string& stringChannelName, std::string id);
+    Field(const std::string& stringFieldName, const std::string& stringChannelName, const std::string& id);
+    Field(const Field&) = delete;
+    Field(Field&&) = default;
     Value findIn(Value valueTarget) const;
 };
 

@@ -81,8 +81,10 @@ void GroupSource::onCreate(std::unique_ptr<server::ChannelControl>&& channelCont
 
     runOnPvxsServer([&](IOCServer* pPvxsServer) {
         // Create callbacks for handling requests and group subscriptions
-        auto& group = pPvxsServer->groupMap[sourceName];
-        createRequestAndSubscriptionHandlers(channelControl, group);
+        auto it(pPvxsServer->groupMap.find(sourceName));
+        if(it != pPvxsServer->groupMap.end()) {
+            createRequestAndSubscriptionHandlers(channelControl, it->second);
+        }
     });
 
 }

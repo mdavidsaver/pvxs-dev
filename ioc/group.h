@@ -30,10 +30,10 @@ public:
 class Group {
 private:
 public:
-    std::string name;
+    const std::string name;
+    const bool atomicPutGet;
+    const bool atomicMonitor;
     Fields fields;
-    bool atomicPutGet = false;
-    bool atomicMonitor = false;
     Value valueTemplate;
     ChannelLocks value;
     ChannelLocks properties;
@@ -41,7 +41,11 @@ public:
     void show(int level) const;
     Field& operator[](const std::string& fieldName);
 
-    Group() = default;
+    Group(const std::string& name, bool atomicPutGet, bool atomicMonitor)
+        :name(name)
+        ,atomicPutGet(atomicPutGet)
+        ,atomicMonitor(atomicMonitor)
+    {}
     Group(const Group&) = delete;
 };
 

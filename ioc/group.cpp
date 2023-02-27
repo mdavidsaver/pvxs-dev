@@ -11,6 +11,7 @@
 #include <sstream>
 
 #include "group.h"
+#include "utilpvt.h"
 
 namespace pvxs {
 namespace ioc {
@@ -70,17 +71,11 @@ void Group::show(int level) const {
  * @return the de-referenced field from the set of fields
  */
 Field& Group::operator[](const std::string& fieldName) {
-    auto foundField = std::find_if(fields.begin(), fields.end(), [fieldName](Field& field) {
-        return fieldName == field.fullName;
-    });
-
-    if (foundField == fields.end()) {
-        std::ostringstream fileNameStream;
-        fileNameStream << "field not found in group: \"" << fieldName << "\"";
-        throw std::logic_error(fileNameStream.str());
-    };
-
-    return *foundField;
+    for(auto& field : fields) {
+        if(field.fullName == fieldName)
+            return field;
+    }
+    throw std::logic_error(SB()<<"field not found in group: \"" << fieldName << "\"");
 }
 
 } // pvxs

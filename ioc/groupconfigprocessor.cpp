@@ -235,10 +235,10 @@ void GroupConfigProcessor::defineTriggers(GroupDefinition& groupDefinition, cons
         groupDefinition.hasTriggers = true;
 
         while (std::getline(splitter, trigger, ',')) {
-            triggers.insert(trigger);
+            triggers.insert(std::move(trigger));
         }
     }
-    groupDefinition.fieldTriggerMap[fieldName] = triggers;
+    groupDefinition.fieldTriggerMap.emplace(fieldName, std::move(triggers));
 }
 
 /**
@@ -291,14 +291,15 @@ GroupConfigProcessor::resolveGroupTriggerReferences(GroupDefinition& groupDefini
         const std::string& fieldName = triggerMapEntry.first;
         const auto& targets = triggerMapEntry.second;
 
-        if (groupDefinition.fieldMap.count(fieldName) == 0) {
+        auto it(groupDefinition.fieldMap.find(fieldName));
+        if (it == groupDefinition.fieldMap.end()) {
             fprintf(stderr, "Error: Group \"%s\" defines triggers from nonexistent field \"%s\" \n",
                     groupName.c_str(), fieldName.c_str());
             continue;
         }
 
-        auto& index = groupDefinition.fieldMap[fieldName];
-        auto& fieldDefinition = groupDefinition.fields[index];
+        auto index = it->second;
+        auto& fieldDefinition = groupDefinition.fields.at(index);
 
         log_debug_printf(_logname, "  pvxs trigger '%s.%s'  -> ", groupName.c_str(), fieldName.c_str());
 
@@ -329,13 +330,14 @@ void GroupConfigProcessor::defineGroupTriggers(FieldDefinition& fieldDefinition,
             }
         } else {
             // otherwise map to the specific target if it exists
-            if (groupDefinition.fieldMap.count(triggerName) == 0) {
+            auto it(groupDefinition.fieldMap.find(triggerName));
+            if (it == groupDefinition.fieldMap.end()) {
                 fprintf(stderr, "Error: Group \"%s\" defines triggers to nonexistent field \"%s\" \n",
                         groupName.c_str(), triggerName.c_str());
                 continue;
             }
-            auto& index = ((FieldDefinitionMap&)groupDefinition.fieldMap)[triggerName];
-            auto& targetedField = groupDefinition.fields[index];
+            auto index = it->second;
+            auto& targetedField = groupDefinition.fields.at(index);
             assert(targetedField.name == triggerName);
 
             // And if it references a PV
@@ -367,16 +369,16 @@ void GroupConfigProcessor::createGroups() {
             auto& groupName = groupDefinitionMapEntry.first;
             auto& groupDefinition = groupDefinitionMapEntry.second;
             try {
-                if (groupMap.count(groupName) != 0) {
+                // Create group
+                auto pair = groupMap.emplace(std::piecewise_construct,
+                                             std::forward_as_tuple(groupName),
+                                             std::forward_as_tuple(groupName,
+                                                                   groupDefinition.atomic != False,
+                                                                   groupDefinition.hasTriggers));
+                if (!pair.second) {
                     throw std::runtime_error("Group name already in use");
                 }
-                // Create group
-                auto& group = groupMap[groupName];
-
-                // Set basic group information
-                group.name = groupName;
-                group.atomicPutGet = groupDefinition.atomic != False;
-                group.atomicMonitor = groupDefinition.hasTriggers;
+                auto& group = pair.first->second;
 
                 // Initialise the given group's fields from the given group definition
                 initialiseGroupFields(group, groupDefinition);
@@ -390,7 +392,9 @@ void GroupConfigProcessor::createGroups() {
             auto& groupName = groupDefinitionMapEntry.first;
             auto& groupDefinition = groupDefinitionMapEntry.second;
             try {
-                auto& group = groupMap[groupName];
+                auto it(groupMap.find(groupName));
+                assert(it!=groupMap.end());
+                auto& group =it->second;
                 // Initialise the given group's db locks
                 initialiseDbLocker(group);
                 // Initialize the given group's triggers and associated db locks
