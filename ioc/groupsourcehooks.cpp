@@ -129,25 +129,30 @@ using namespace pvxs;
  * @param theInitHookState the initHook state - we only want to trigger on the initHookAfterIocBuilt state - ignore all others
  */
 void qsrvGroupSourceInit(initHookState theInitHookState) {
-    if (theInitHookState == initHookAfterInitDatabase) {
-        GroupConfigProcessor processor;
-        // Parse all info(Q:Group... records to configure groups
-        processor.loadConfigFromDb();
+    try {
+        if (theInitHookState == initHookAfterInitDatabase) {
+            GroupConfigProcessor processor;
+            // Parse all info(Q:Group... records to configure groups
+            processor.loadConfigFromDb();
 
-        // Load group configuration files
-        processor.loadConfigFiles();
+            // Load group configuration files
+            processor.loadConfigFiles();
 
-        // Configure groups
-        processor.defineGroups();
+            // Configure groups
+            processor.defineGroups();
 
-        // Resolve triggers
-        processor.resolveTriggerReferences();
+            // Resolve triggers
+            processor.resolveTriggerReferences();
 
-        // Create Server Groups
-        processor.createGroups();
-    } else if (theInitHookState == initHookAfterIocBuilt) {
-        // Load group configuration from parsed groups in iocServer
-        pvxs::ioc::iocServer().addSource("qsrvGroup", std::make_shared<pvxs::ioc::GroupSource>(), 1);
+            // Create Server Groups
+            processor.createGroups();
+        } else if (theInitHookState == initHookAfterIocBuilt) {
+            // Load group configuration from parsed groups in iocServer
+            pvxs::ioc::iocServer().addSource("qsrvGroup", std::make_shared<pvxs::ioc::GroupSource>(), 1);
+        }
+    } catch(std::exception& e) {
+        fprintf(stderr, "ERROR: Unhandled exception in %s(%d): %s\n",
+                __func__, theInitHookState, e.what());
     }
 }
 
