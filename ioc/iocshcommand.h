@@ -88,8 +88,32 @@ public:
     }
 };
 
-void runOnServer(const std::function<void(IOCServer*)>& function, const char* method = nullptr,
-        const char* context = nullptr);
+extern std::atomic<IOCServer*> pvxsServer;
+
+/**
+ * Get the pvxs server and execute the given function against it
+ *
+ * @param function the function to call
+ * @param method the string method from which this is called.  Use the __func__ macro by default
+ * @param context the activity being attempted when the error occurred
+ */
+template<typename FN>
+void
+runOnServer(FN&& function, const char* method, const char* context = nullptr) {
+    try {
+        if (auto pPvxsServer = pvxsServer.load()) {
+            function(pPvxsServer);
+        }
+    } catch (std::exception& e) {
+        fprintf(stderr, "%s%sError in %s: %s\n",
+                context ? context : "",
+                context ? ": " : "",
+                method,
+                e.what());
+        throw e;
+    }
+}
+
 
 } // pvxs
 } // ioc

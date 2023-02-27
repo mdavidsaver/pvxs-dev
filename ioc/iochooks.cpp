@@ -67,31 +67,6 @@ IOCServer& iocServer() {
 }
 
 /**
- * Get the pvxs server and execute the given function against it
- *
- * @param function the function to call
- * @param method the string method from which this is called.  Use the __func__ macro by default
- * @param context the activity being attempted when the error occurred
- */
-void
-runOnServer(const std::function<void(IOCServer*)>& function, const char* method, const char* context) {
-    try {
-        if (auto pPvxsServer = pvxsServer.load()) {
-            function(pPvxsServer);
-        }
-    } catch (std::exception& e) {
-        if (context) {
-            fprintf(stderr, "%s: ", context);
-        }
-        if (method) {
-            fprintf(stderr, "Error in %s: ", method);
-        }
-        fprintf(stderr, "%s\n", e.what());
-        throw e;
-    }
-}
-
-/**
  * The function to call when we exit the IOC process.  This is only installed as the callback function
  * after the database has been initialized.  This function will stop the pvxs server instance and destroy the
  * object.
