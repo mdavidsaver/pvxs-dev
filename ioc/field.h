@@ -49,7 +49,9 @@ public:
     bool isArray = false;
     ChannelAndLock value;
     ChannelAndLock properties;
-    std::vector<Field*> triggers;          // reference to the fields that are triggered by this field during subscriptions
+    // reference to the fields that are triggered by this field during subscriptions
+    // points to storage in containing Group::fields
+    std::vector<Field*> triggers;
 
     Field(const std::string& stringFieldName, const std::string& stringChannelName, const std::string& id);
     Field(const Field&) = delete;

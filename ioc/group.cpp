@@ -36,28 +36,32 @@ void Group::show(int level) const {
 
     // If we need to show detailed information then iterate through all fields showing details
     if (level > 1) {
-        if (!fields.empty()) {
-            for (auto& field: fields) {
-                if (!field.id.empty()) {
-                    std::string suffix;
-                    printf("    ");
-                    suffix = "<id>";
-                    field.fieldName.show(suffix);
-                    printf(" <-> \"%s\"\n", field.id.c_str());
-                }
+        for (auto& field: fields) {
+            const char* mapname = "      ";
+            if (field.isMeta) {
+                mapname = "<meta>";
+            } else if (field.allowProc) {
+                mapname = "<proc>";
+            }
+            // "  grp.fld <meta> id=foo chan=pv:name.VAL\n"
+            printf("  %s %s%s%s%s%s%s\n",
+                   field.fieldName.to_string().c_str(),
+                   mapname,
+                   field.id.empty() ? "" : " id=",
+                   field.id.empty() ? "" : field.id.c_str(),
+                   field.value.channel ? " chan=" : "",
+                   field.value.channel ? dbChannelName(field.value.channel) : "",
+                   field.triggers.empty() ? "" : " has triggers");
 
-                if (field.value.channel) {
-                    printf("    ");
-                    std::string suffix;
-                    if (field.isMeta) {
-                        suffix = "<meta>";
-                    } else if (field.allowProc) {
-                        suffix = "<proc>";
+            if(level > 2) {
+                for(auto& trig : field.triggers) {
+                    bool found = false;
+                    for(auto& field2 : fields) {
+                        found |= &field2 == trig; // cross-check pointer validity
                     }
-                    field.fieldName.show(suffix);
-                    if (field.value.channel) {
-                        printf(" <-> %s\n", dbChannelName(field.value.channel));
-                    }
+                    if(!found)
+                        printf("ERROR inconsistent field triggers!!!\n");
+                    printf("    %s\n", trig->fieldName.to_string().c_str());
                 }
             }
         }
