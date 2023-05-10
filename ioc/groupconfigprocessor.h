@@ -45,7 +45,6 @@ public:
 
     GroupConfigProcessor();
 
-    static void checkForTrailingCommentsAtEnd(const std::string& line);
     void validateGroups();
     void defineGroups();
     void createGroups();

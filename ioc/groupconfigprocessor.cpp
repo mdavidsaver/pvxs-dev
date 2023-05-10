@@ -857,20 +857,6 @@ const char* GroupConfigProcessor::infoField(DBEntry& dbEntry, const char* key, c
 }
 
 /**
- * Checks to see if there are trailing comments at the end of the line.
- * Throws an exception if there are
- *
- * @param line the line to check
- */
-void GroupConfigProcessor::checkForTrailingCommentsAtEnd(const std::string& line) {
-    size_t idx = line.find_first_not_of(" \t\n\r");
-    if (idx != std::string::npos) {
-        // trailing comments not allowed
-        throw std::runtime_error("Trailing comments are not allowed");
-    }
-}
-
-/**
  * Add a scalar field as the prescribed subfield by adding the appropriate members to the given members list
  *
  * e.g: fieldName: "a.b", type => NTScalar, leaf = {NTScalar{}} - a single structure with ID, and members corresponding to NTScalar
@@ -1107,7 +1093,12 @@ bool GroupConfigProcessor::yajlParseHelper(std::istream& jsonGroupDefinitionStre
             size_t consumed = yajl_get_bytes_consumed(handle);
 
             if (consumed < line.size()) {
-                checkForTrailingCommentsAtEnd(line.substr(consumed));
+                size_t idx = line.find_first_not_of(" \t\n\r", consumed);
+                if (idx != std::string::npos) {
+                    // TODO: detect the end of potentially multi-line comments...
+                    // for now trailing comments not allowed
+                    throw std::runtime_error("Trailing content after } are not allowed");
+                }
             }
 
 #ifndef EPICS_YAJL_VERSION
