@@ -486,13 +486,13 @@ void IOCSource::setForceProcessingFlag(const Value& pvRequest,
 }
 
 static
-void doDbPut(dbChannel* pDbChannel, const void *pValueBuffer, size_t nElements)
+void doDbPut(dbChannel* pDbChannel, short dbr, const void *pValueBuffer, size_t nElements)
 {
     long status;
     if (dbChannelFieldType(pDbChannel) >= DBF_INLINK && dbChannelFieldType(pDbChannel) <= DBF_FWDLINK) {
-        status = dbChannelPutField(pDbChannel, dbChannelFinalFieldType(pDbChannel), pValueBuffer, nElements);
+        status = dbChannelPutField(pDbChannel, dbr, pValueBuffer, nElements);
     } else {
-        status = dbChannelPut(pDbChannel, dbChannelFinalFieldType(pDbChannel), pValueBuffer, nElements);
+        status = dbChannelPut(pDbChannel, dbr, pValueBuffer, nElements);
     }
     DBErrorMessage dbErrorMessage(status);
     if (dbErrorMessage) {
@@ -544,7 +544,7 @@ void putScalar(dbChannel* pDbChannel, const Value& value)
         throw std::logic_error(SB()<<__func__<<" unhandled case "<<dbChannelFinalFieldType(pDbChannel));
     }
 
-    doDbPut(pDbChannel, &buf, 1u);
+    doDbPut(pDbChannel, dbChannelFinalFieldType(pDbChannel), &buf, 1u);
 }
 
 static
@@ -553,7 +553,7 @@ void putLongString(dbChannel* pDbChannel, const Value& value)
     auto str(value.as<std::string>());
     auto N = str.size()+1u; // include NIL
 
-    doDbPut(pDbChannel, str.c_str(), N);
+    doDbPut(pDbChannel, dbChannelFinalFieldType(pDbChannel), str.c_str(), N);
 }
 
 static
@@ -569,7 +569,7 @@ void putStringArray(dbChannel* pDbChannel, const Value& value)
         pCurrent += MAX_STRING_SIZE;
     }
 
-    doDbPut(pDbChannel, buf.data(), arr.size());
+    doDbPut(pDbChannel, DBR_STRING, buf.data(), arr.size());
 }
 
 static
@@ -577,7 +577,32 @@ void putArray(dbChannel* pDbChannel, const Value& value)
 {
     auto arr = value.as<shared_array<const void>>();
 
-    doDbPut(pDbChannel, arr.data(), arr.size());
+    short dbr;
+    switch(arr.original_type()) {
+    case ArrayType::Null:
+        return;
+    case ArrayType::Bool:
+    case ArrayType::Value:
+    default:
+        throw std::runtime_error(SB()<<"Unsupported "<<__func__<<" from "<<arr.original_type());
+    case ArrayType::Int8:    dbr = DBR_CHAR; break;
+    case ArrayType::Int16:   dbr = DBR_SHORT; break;
+    case ArrayType::Int32:   dbr = DBR_LONG; break;
+    case ArrayType::UInt8:   dbr = DBR_UCHAR; break;
+    case ArrayType::UInt16:  dbr = DBR_USHORT; break;
+    case ArrayType::UInt32:  dbr = DBR_ULONG; break;
+#ifdef DBR_INT64
+    case ArrayType::Int64:   dbr = DBR_INT64; break;
+    case ArrayType::UInt64:  dbr = DBR_UINT64; break;
+#endif
+    case ArrayType::Float32: dbr = DBR_FLOAT; break;
+    case ArrayType::Float64: dbr = DBR_DOUBLE; break;
+    case ArrayType::String:
+        putStringArray(pDbChannel, value);
+        return;
+    }
+
+    doDbPut(pDbChannel, dbr, arr.data(), arr.size());
 }
 
 /**
@@ -594,7 +619,7 @@ void IOCSource::put(dbChannel* pDbChannel, const Value& node, MappingInfo info) 
     case MappingInfo::Structure:
         return; // can't write
     case MappingInfo::Any:
-        value = value["->"]; // de-ref into Any
+        value = node["->"]; // de-ref into Any
         break;
     case MappingInfo::Plain:
         value = node;

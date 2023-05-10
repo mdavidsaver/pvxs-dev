@@ -433,6 +433,12 @@ void testImage()
               "x.timeStamp.nanoseconds int32_t = 102030\n");
 
     sub.testEmpty();
+
+    {
+        shared_array<const int32_t> arr({1, 2, 3});
+        ctxt.put("img:Array").set("value", arr).pvRequest("record[process=false]").exec()->wait(1111115.0);
+        testdbGetArrFieldEqual("img:ArrayData", DBR_LONG, arr.size(), arr.size(), arr.data());
+    }
 }
 
 void testIQ()
@@ -679,7 +685,7 @@ void testConst()
 
 MAIN(testqgroup)
 {
-    testPlan(30);
+    testPlan(31);
     testSetup();
     {
         TestIOC ioc;
