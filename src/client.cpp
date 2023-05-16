@@ -1247,7 +1247,8 @@ void ContextImpl::tickSearch(SearchKind kind, bool poked)
                 if(err==EINTR || err==EPERM || !pair.lastSuccess)
                     lvl = Level::Debug;
                 log_printf(io, lvl, "Search tx %s error (%d) %s\n",
-                           pair.dest.addr.tostring().c_str(), err, evutil_socket_error_to_string(err));
+                           std::string(SB()<<pair.dest).c_str(),
+                           err, evutil_socket_error_to_string(err));
                 pair.lastSuccess = false;
 
             } else if(unsigned(ntx)<consumed) {
