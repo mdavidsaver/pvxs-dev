@@ -373,13 +373,33 @@ void expandAddrList(const std::vector<SockEndpoint>& ifaces,
             // treat [::] as 0.0.0.0
             matchAddr = nullptr;
 
-        } else if(saddr.addr.family()!=AF_INET) {
-            continue;
         }
 
-        for(auto& addr : dummy.broadcasts(matchAddr)) {
-            addr.setPort(0u);
-            addrs.emplace_back(addr);
+        // add ipv6 before ipv4.  order is preserved, so ipv6 searches go out first.
+        if(!evsocket::canIPv6) {
+            // nothing
+        } else if(saddr.addr.family()==AF_INET6 || (evsocket::ipstack==evsocket::Linsock && saddr.addr.isAny())) {
+            const SockAddr mcast("[ff02::70:7661]");
+
+            if(saddr.addr.isAny()) {
+                for(const auto& ifpair : ifmap.current->byIndex) {
+                    if(ifpair.second.isLO)
+                        continue; // ipv6 doesn't seem to support mcast via. loopback :(
+                    addrs.emplace_back(mcast);
+                    addrs.back().ttl = 1;
+                    addrs.back().iface = ifpair.second.name;
+                }
+            } else {
+                addrs.emplace_back(mcast);
+                addrs.back().ttl = 1;
+                addrs.back().iface = ifmap.name_of(saddr.addr);
+            }
+        }
+        if(saddr.addr.family()==AF_INET || matchAddr==nullptr) {
+            for(auto& addr : dummy.broadcasts(matchAddr)) {
+                addr.setPort(0u);
+                addrs.emplace_back(addr);
+            }
         }
     }
 }
