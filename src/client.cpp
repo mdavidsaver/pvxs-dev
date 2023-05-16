@@ -1165,7 +1165,8 @@ void ContextImpl::tickSearch(SearchKind kind, bool poked)
                 if(err==EINTR || err==EPERM)
                     lvl = Level::Debug;
                 log_printf(io, lvl, "Search tx %s error (%d) %s\n",
-                           pair.first.addr.tostring().c_str(), err, evutil_socket_error_to_string(err));
+                           std::string(SB()<<pair.first).c_str(),
+                           err, evutil_socket_error_to_string(err));
 
             } else if(unsigned(ntx)<consumed) {
                 log_warn_printf(io, "Search truncated %u < %u",
