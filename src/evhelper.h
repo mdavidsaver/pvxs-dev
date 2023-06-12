@@ -19,12 +19,19 @@
 #include <event2/listener.h>
 #include <event2/bufferevent.h>
 
+#ifdef PVXS_ENABLE_OPENSSL
+#  include <event2/bufferevent_ssl.h>
+#endif
+
 #include <pvxs/version.h>
 #include <utilpvt.h>
 
 #include <epicsTime.h>
 
 #include "pvaproto.h"
+#ifdef PVXS_ENABLE_OPENSSL
+#  include "ossl.h"
+#endif
 
 // hooks for std::unique_ptr
 namespace std {
@@ -61,10 +68,27 @@ template<typename T>
 struct owned_ptr : public std::unique_ptr<T>
 {
     constexpr owned_ptr() {}
+    constexpr owned_ptr(std::nullptr_t np) : std::unique_ptr<T>(np) {}
     explicit owned_ptr(const char* file, int line, T* ptr) : std::unique_ptr<T>(ptr) {
         if(!*this)
             throw loc_bad_alloc(file, line);
     }
+
+    // for functions which return a pointer in an argument
+    //   int some(T** presult); // store *presult = output
+    // use like
+    //   owned_ptr<T> x;
+    //   some(x.acquire());
+    struct acquisition {
+        owned_ptr<T>* o;
+        T* ptr = nullptr;
+        operator T** () { return &ptr; }
+        constexpr acquisition(owned_ptr<T>* o) :o(o) {}
+        ~acquisition() {
+            o->reset(ptr);
+        }
+    };
+    acquisition acquire() { return acquisition{this}; }
 };
 
 /* It seems that std::function<void()>(Fn&&) from gcc (circa 8.3) and clang (circa 7.0)

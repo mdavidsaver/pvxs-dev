@@ -202,6 +202,17 @@ void pvxrefdiff() {
     }
 }
 
+void pvxreconfigure()
+{
+    if (auto pPvxsServer = pvxsServer.load()) {
+        printf("Reconfiguring QSRV\n");
+        pPvxsServer->reconfigure(server::Config::from_env());
+        pvxsr(0); // print new configuration
+    } else {
+        fprintf(stderr, "Warning: QSRV not running\n");
+    }
+}
+
 } // namespace
 
 /**
@@ -302,6 +313,9 @@ void pvxsBaseRegistrar() {
                        "Save the current set of instance counters for reference by later pvxrefdiff.\n").implementation<&pvxrefsave>();
         IOCShCommand<>("pvxrefdiff",
                        "Show different of current instance counts with those when pvxrefsave was called.\n").implementation<&pvxrefdiff>();
+        IOCShCommand<>("pvxreconfigure",
+                       "Reconfigure QSRV using current values of EPICS_PVA*\n")
+                .implementation<&pvxreconfigure>();
 
         // Initialise the PVXS Server
         initialisePvxsServer();
