@@ -1,0 +1,253 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Guides &#8212; PVXS 1.2.2 documentation</title>
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="shortcut icon" href="_static/favicon.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="PVA Network Configuration" href="netconfig.html" />
+    <link rel="prev" title="Overview" href="overview.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="guides">
+<h1>Guides<a class="headerlink" href="#guides" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="manipulating-value">
+<span id="dataguide"></span><h2>Manipulating Value<a class="headerlink" href="#manipulating-value" title="Permalink to this headline">¶</a></h2>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;pvxs/data.h&gt;</span><span class="cp"></span>
+<span class="k">using</span> <span class="k">namespace</span> <span class="n">pvxs</span><span class="p">;</span>
+</pre></div>
+</div>
+<p><a class="reference internal" href="value.html#_CPPv4N4pvxs5ValueE" title="pvxs::Value"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::Value</span></code></a> is the primary data container type used with PVXS.
+A <a class="reference internal" href="value.html#_CPPv4N4pvxs5ValueE" title="pvxs::Value"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::Value</span></code></a> may be obtained via the remote peer (client or server),
+or created locally.  See <a class="reference internal" href="value.html#valueapi"><span class="std std-ref">Value Container API</span></a>, <a class="reference internal" href="nt.html#ntapi"><span class="std std-ref">Common Type Definitions</span></a> and <a class="reference internal" href="typedef.html#typedefapi"><span class="std std-ref">Defining Custom Types</span></a>.</p>
+<p><a class="reference internal" href="value.html#_CPPv4N4pvxs5ValueE" title="pvxs::Value"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::Value</span></code></a> is a safe pointer-like object which may reference
+a field in an underlying data structure.
+Either a (sub)structure, or a leaf field.</p>
+<div class="section" id="referencing-fields">
+<h3>Referencing fields<a class="headerlink" href="#referencing-fields" title="Permalink to this headline">¶</a></h3>
+<p>Conceptually, each data structure may be thought of as an array of nodes.
+Each node representing either a (sub) structure field, of a leaf field.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">Value</span></code> may reference any node/field.
+Either a (sub)structure node, or a leaf field.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">Value</span> <span class="n">empty</span><span class="p">;</span>
+<span class="n">assert</span><span class="p">(</span><span class="o">!</span><span class="n">empty</span><span class="p">.</span><span class="n">valid</span><span class="p">());</span>
+<span class="n">assert</span><span class="p">(</span><span class="o">!</span><span class="n">empty</span><span class="p">);</span> <span class="c1">// equivalent short-hand</span>
+</pre></div>
+</div>
+<p>Above <code class="docutils literal notranslate"><span class="pre">empty</span></code> does not reference any underlying data structure,
+and so is an “invalid” or “empty” reference.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">Value</span> <span class="n">top</span> <span class="o">=</span> <span class="n">TypeDef</span><span class="p">(</span><span class="n">TypeCode</span><span class="o">::</span><span class="n">Struct</span><span class="p">,</span> <span class="p">{</span>
+    <span class="n">members</span><span class="o">::</span><span class="n">Int32</span><span class="p">(</span><span class="s">&quot;fld_a&quot;</span><span class="p">),</span>
+    <span class="n">members</span><span class="o">::</span><span class="n">Float64</span><span class="p">(</span><span class="s">&quot;fld_b&quot;</span><span class="p">),</span>
+    <span class="n">members</span><span class="o">::</span><span class="n">Struct</span><span class="p">(</span><span class="s">&quot;fld_c&quot;</span><span class="p">,</span> <span class="p">{</span>
+        <span class="n">members</span><span class="o">::</span><span class="n">String</span><span class="p">(</span><span class="s">&quot;str&quot;</span><span class="p">),</span>
+    <span class="p">}),</span>
+<span class="p">}).</span><span class="n">create</span><span class="p">();</span>
+
+<span class="n">Value</span> <span class="n">x</span> <span class="o">=</span> <span class="n">top</span><span class="p">[</span><span class="s">&quot;fld_b&quot;</span><span class="p">];</span>
+</pre></div>
+</div>
+<div class="graphviz"><img src="_images/graphviz-24348a0c5762442fe3380b1e26b9dd311d270812.png" alt="digraph {
+    graph [rankdir = &quot;LR&quot;];
+    top [shape=box,label=&quot;Value top&quot;]
+    x [shape=box,label=&quot;Value b&quot;]
+    struct [
+        shape = record
+        label = &quot;&lt;top&gt; Struct | &lt;a&gt; Int32 fld_a | &lt;b&gt; Float64 fld_b | &lt;c&gt; Struct fld_c | { &lt;str&gt; String fld_c.str }&quot;
+    ]
+    top -&gt; struct:top
+    x -&gt; struct:fld_b
+}" class="graphviz" /></div>
+<p>Above <code class="docutils literal notranslate"><span class="pre">top</span></code> references the anonymous top level structure field,
+while <code class="docutils literal notranslate"><span class="pre">x</span></code> references the “fld_b” field.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p><code class="docutils literal notranslate"><span class="pre">operator=</span></code> for anything other than <code class="docutils literal notranslate"><span class="pre">Value</span></code> is a short-hand notation for <a class="reference internal" href="value.html#_CPPv4I0EN4pvxs5Value4fromEvRK1T" title="pvxs::Value::from"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::Value::from()</span></code></a>.</p>
+</div>
+<p>Assigning a <code class="docutils literal notranslate"><span class="pre">Value</span></code> to a <code class="docutils literal notranslate"><span class="pre">Value</span></code> changes which underlying field is referenced.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">top</span><span class="p">[</span><span class="s">&quot;fld_c.str&quot;</span><span class="p">];</span>
+</pre></div>
+</div>
+<div class="graphviz"><img src="_images/graphviz-96ddd63724c821efb7979345db6b45d80c345ee3.png" alt="digraph {
+    graph [rankdir = &quot;LR&quot;];
+    top [shape=box,label=&quot;Value top&quot;]
+    x [shape=box,label=&quot;Value b&quot;]
+    struct [
+        shape = record
+        label = &quot;&lt;top&gt; Struct | &lt;a&gt; Int32 fld_a | &lt;b&gt; Float64 fld_b | &lt;c&gt; Struct fld_c | { &lt;str&gt; String fld_c.str }&quot;
+    ]
+    top -&gt; struct:top
+    x -&gt; struct:str
+}" class="graphviz" /></div>
+<p>Now <code class="docutils literal notranslate"><span class="pre">x</span></code> references the <code class="docutils literal notranslate"><span class="pre">str</span></code> member of the <code class="docutils literal notranslate"><span class="pre">fld_c</span></code> sub-structure.</p>
+</div>
+<div class="section" id="field-storage">
+<h3>Field storage<a class="headerlink" href="#field-storage" title="Permalink to this headline">¶</a></h3>
+<p>Fields other than <code class="docutils literal notranslate"><span class="pre">Struct</span></code> have associated storage,
+which may be accessed with the <a class="reference internal" href="value.html#_CPPv4I0ENK4pvxs5Value2asEbR1T" title="pvxs::Value::as"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::Value::as()</span></code></a> and <a class="reference internal" href="value.html#_CPPv4I0EN4pvxs5Value4fromEvRK1T" title="pvxs::Value::from"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::Value::from()</span></code></a> methods.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="s">&quot;hello world&quot;</span><span class="p">;</span>
+<span class="c1">// ... or equivalently</span>
+<span class="n">x</span><span class="p">.</span><span class="n">from</span><span class="p">(</span><span class="s">&quot;hello world&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Here the storage of <code class="docutils literal notranslate"><span class="pre">fld_c.str</span></code> has been modified from the initial empty string
+to “hello world”.  (Note that <code class="docutils literal notranslate"><span class="pre">from()</span></code> also “marks” this field as changed)</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">assert</span><span class="p">(</span><span class="n">x</span><span class="p">.</span><span class="n">as</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">()</span> <span class="o">==</span> <span class="s">&quot;hello world&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">as&lt;T&gt;()</span></code> method fetches the currently stored value.</p>
+<p>Both <code class="docutils literal notranslate"><span class="pre">from&lt;T&gt;()</span></code> and <code class="docutils literal notranslate"><span class="pre">as&lt;T&gt;()</span></code> may perform implicit type conversions.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">x</span><span class="p">.</span><span class="n">as</span><span class="o">&lt;</span><span class="kt">int32_t</span><span class="o">&gt;</span><span class="p">();</span> <span class="c1">// throws pvxs::NoConvert</span>
+<span class="n">x</span> <span class="o">=</span> <span class="s">&quot;42&quot;</span><span class="p">;</span>
+<span class="n">assert</span><span class="p">(</span><span class="n">x</span><span class="p">.</span><span class="n">as</span><span class="o">&lt;</span><span class="kt">int32_t</span><span class="o">&gt;</span><span class="p">()</span> <span class="o">==</span> <span class="mi">42</span><span class="p">);</span> <span class="c1">// Ok!</span>
+<span class="n">x</span> <span class="o">=</span> <span class="mi">43</span><span class="p">;</span> <span class="c1">// Ok!</span>
+<span class="n">assert</span><span class="p">(</span><span class="n">x</span><span class="p">.</span><span class="n">as</span><span class="o">&lt;</span><span class="n">std</span><span class="o">::</span><span class="n">string</span><span class="o">&gt;</span><span class="p">()</span> <span class="o">==</span> <span class="s">&quot;43&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="arrays-of-simple-types">
+<h3>Arrays of simple types<a class="headerlink" href="#arrays-of-simple-types" title="Permalink to this headline">¶</a></h3>
+<p>Array fields are handled with the <a class="reference internal" href="value.html#_CPPv4I00EN4pvxs12shared_arrayE" title="pvxs::shared_array"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::shared_array</span></code></a> array container,
+which is intended to behave similarly to <code class="docutils literal notranslate"><span class="pre">std::vector</span></code>.
+The primary differences are the use of reference counting to avoid copies.
+And support for void vs. non-void, and const vs. non-const element types.</p>
+<p>When stored through a <code class="docutils literal notranslate"><span class="pre">Value</span></code>, a <code class="docutils literal notranslate"><span class="pre">shared_array</span></code> must be const.
+This prevents unexpected modification of arrays which may be shared with other code.
+Often a <code class="docutils literal notranslate"><span class="pre">shared_array</span></code> needs to be non-const when being initially populated.
+The <a class="reference internal" href="value.html#_CPPv4N4pvxs12shared_array6freezeEv" title="pvxs::shared_array::freeze"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::shared_array::freeze()</span></code></a> and <a class="reference internal" href="value.html#_CPPv4N4pvxs12shared_array4thawEv" title="pvxs::shared_array::thaw"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::shared_array::thaw()</span></code></a> methods can change
+an array between const and non-const.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="n">shared_array</span><span class="o">&lt;</span><span class="kt">int32_t</span><span class="o">&gt;</span> <span class="n">iarr</span><span class="p">({</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">});</span>
+<span class="n">iarr</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">5</span><span class="p">;</span>
+
+<span class="n">shared_array</span><span class="o">&lt;</span><span class="k">const</span> <span class="kt">int32_t</span><span class="o">&gt;</span> <span class="n">const_iarr</span><span class="p">(</span><span class="n">iarr</span><span class="p">.</span><span class="n">freeze</span><span class="p">());</span>
+<span class="c1">// cleared &#39;iarr&#39; like std::move(&#39;iarr&#39;)</span>
+
+<span class="n">const_iarr</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mi">4</span><span class="p">;</span> <span class="c1">// compile error!</span>
+</pre></div>
+</div>
+<p>Here a non-const array is allocated and modified by setting the third element to <code class="docutils literal notranslate"><span class="pre">5</span></code>.
+Then <code class="docutils literal notranslate"><span class="pre">iarr</span></code>, the one (and only) reference to this array is “frozen” into an immutable const array.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="c1">// Value top;</span>
+<span class="n">Value</span> <span class="n">top</span> <span class="o">=</span> <span class="n">TypeDef</span><span class="p">(</span><span class="n">TypeCode</span><span class="o">::</span><span class="n">Struct</span><span class="p">,</span> <span class="p">{</span>
+    <span class="n">members</span><span class="o">::</span><span class="n">Int32A</span><span class="p">(</span><span class="s">&quot;farr&quot;</span><span class="p">),</span>
+<span class="p">}).</span><span class="n">create</span><span class="p">();</span>
+
+<span class="n">top</span><span class="p">[</span><span class="s">&quot;farr&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">const_iarr</span><span class="p">;</span>
+<span class="n">top</span><span class="p">[</span><span class="s">&quot;farr&quot;</span><span class="p">].</span><span class="n">from</span><span class="p">(</span><span class="n">const_iarr</span><span class="p">);</span> <span class="c1">// equivalent</span>
+</pre></div>
+</div>
+<p>Now a reference to the immutable array has been placed into the “farr” field.</p>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="k">auto</span> <span class="nf">other</span><span class="p">(</span><span class="n">top</span><span class="p">[</span><span class="s">&quot;farr&quot;</span><span class="p">].</span><span class="n">as</span><span class="o">&lt;</span><span class="n">shared_array</span><span class="o">&lt;</span><span class="k">const</span> <span class="kt">int32_t</span><span class="o">&gt;&gt;</span><span class="p">();</span>
+<span class="n">assert</span><span class="p">(</span><span class="n">const_iarr</span><span class="p">.</span><span class="n">data</span><span class="p">()</span> <span class="o">==</span> <span class="n">other</span><span class="p">.</span><span class="n">data</span><span class="p">());</span>
+</pre></div>
+</div>
+<p>And finally, another reference is retrieved from the “farr” field.</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">PVXS</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Guides</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#manipulating-value">Manipulating Value</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#referencing-fields">Referencing fields</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#field-storage">Field storage</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#arrays-of-simple-types">Arrays of simple types</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="netconfig.html">PVA Network Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building from Source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="building.html#including-pvxs-in-your-application">Including PVXS in your application</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="value.html">Value Container API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="client.html">Client API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="server.html">Server API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ioc.html">IOC Integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ioc.html#qsrv-2">QSRV 2</a></li>
+<li class="toctree-l1"><a class="reference internal" href="util.html">Misc</a></li>
+<li class="toctree-l1"><a class="reference internal" href="details.html">Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releasenotes.html">Release Notes</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="overview.html" title="previous chapter">Overview</a></li>
+      <li>Next: <a href="netconfig.html" title="next chapter">PVA Network Configuration</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023 Michael Davidsaver and Osprey DCS LLC.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/guide.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

@@ -1,0 +1,405 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>IOC Integration &#8212; PVXS 1.2.2 documentation</title>
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="_static/graphviz.css" />
+    <script id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script src="_static/jquery.js"></script>
+    <script src="_static/underscore.js"></script>
+    <script src="_static/doctools.js"></script>
+    <link rel="shortcut icon" href="_static/favicon.png"/>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Misc" href="util.html" />
+    <link rel="prev" title="Data Source" href="source.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          <div class="body" role="main">
+            
+  <div class="section" id="ioc-integration">
+<h1>IOC Integration<a class="headerlink" href="#ioc-integration" title="Permalink to this headline">¶</a></h1>
+<div class="highlight-c++ notranslate"><div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;pvxs/iochooks.h&gt;</span><span class="cp"></span>
+<span class="k">namespace</span> <span class="n">pvxs</span> <span class="p">{</span> <span class="k">namespace</span> <span class="k">namespace</span> <span class="n">ioc</span> <span class="p">{</span> <span class="p">...</span> <span class="p">}</span> <span class="p">}</span>
+</pre></div>
+</div>
+<p>The separate <code class="docutils literal notranslate"><span class="pre">pvxsIoc</span></code> library exists to run a PVXS server as part of an IOC.
+See also <a class="reference internal" href="building.html#includepvxs"><span class="std std-ref">Including PVXS in your application</span></a>.</p>
+<p>IOC Integration respects the <strong>$PVXS_LOG</strong> as well as <strong>$EPICS_PVA*</strong> environment variables.
+Changes to this environment variable are possible prior to
+calling <code class="docutils literal notranslate"><span class="pre">\*_registerRecordDeviceDriver(pdbbase)</span></code>.</p>
+<div class="section" id="ioc-shell">
+<h2>IOC shell<a class="headerlink" href="#ioc-shell" title="Permalink to this headline">¶</a></h2>
+<p>The “pvxsIoc” library adds several IOC shell functions which apply to all PVs
+served by the Integrated PVA server.</p>
+<dl class="cpp function">
+<dt id="_CPPv45pvxsri">
+<span id="_CPPv35pvxsri"></span><span id="_CPPv25pvxsri"></span><span id="pvxsr__i"></span>void <code class="sig-name descname">pvxsr</code><span class="sig-paren">(</span>int <em>level</em><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv45pvxsri" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>PVXS Server Report.  Shows information about server configuration (level==0)
+or about connected clients (level&gt;0).  Indirectly calls <a class="reference internal" href="source.html#_CPPv4N4pvxs6server6Source4showERNSt7ostreamE" title="pvxs::server::Source::show"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::server::Source::show()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt id="_CPPv45pvxsli">
+<span id="_CPPv35pvxsli"></span><span id="_CPPv25pvxsli"></span><span id="pvxsl__i"></span>void <code class="sig-name descname">pvxsl</code><span class="sig-paren">(</span>int <em>level</em><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv45pvxsli" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>PVXS Server List.  Lists attached Sources and PV names.
+Indirectly calls <a class="reference internal" href="source.html#_CPPv4N4pvxs6server6Source6onListEv" title="pvxs::server::Source::onList"><code class="xref cpp cpp-any docutils literal notranslate"><span class="pre">pvxs::server::Source::onList()</span></code></a>.</p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt id="_CPPv45pvxsiv">
+<span id="_CPPv35pvxsiv"></span><span id="_CPPv25pvxsiv"></span><span id="pvxsi"></span>void <code class="sig-name descname">pvxsi</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv45pvxsiv" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Print information about module versions, target, and toolchain.
+May be requested when reporting a bug.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="adding-custom-pvs-to-server">
+<h2>Adding custom PVs to Server<a class="headerlink" href="#adding-custom-pvs-to-server" title="Permalink to this headline">¶</a></h2>
+<dl class="cpp function">
+<dt id="_CPPv4N4pvxs3ioc6serverEv">
+<span id="_CPPv3N4pvxs3ioc6serverEv"></span><span id="_CPPv2N4pvxs3ioc6serverEv"></span><span id="pvxs::ioc::server"></span><span class="target" id="iochooks_8h_1aa77d4e8e561e79f912e9527021afc711"></span><a class="reference internal" href="#_CPPv4N4pvxs3ioc6serverEv" title="pvxs::ioc::server">server</a>::Server <code class="sig-prename descclassname">pvxs::ioc<code class="sig-prename descclassname">::</code></code><code class="sig-name descname">server</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv4N4pvxs3ioc6serverEv" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Return the singleton Server instance which is setup for use in an IOC process.</p>
+<p>This Server instance is created during a registrar function, started by the initHookAfterCaServerRunning phase of iocInit(). It is stopped and destroyed during an epicsAtExit() hook added during an initHookAfterInitDatabase hook..</p>
+<p>Any configuration changes via. epicsEnvSet() must be made before registrars are run by *_registerRecordDeviceDriver(pdbbase).</p>
+<p><a class="reference internal" href="sharedpv.html#structpvxs_1_1server_1_1SharedPV"><span class="std std-ref">server::SharedPV</span></a> and <a class="reference internal" href="source.html#structpvxs_1_1server_1_1Source"><span class="std std-ref">server::Source</span></a> added before iocInit() will be available immediately. Others may be added (or removed) later.</p>
+<p><div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">static</span> <span class="n">void</span> <span class="n">myinitHook</span><span class="p">(</span><span class="n">initHookState</span> <span class="n">state</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span><span class="p">(</span><span class="n">state</span><span class="o">!=</span><span class="n">initHookAfterIocBuilt</span><span class="p">)</span>
+        <span class="k">return</span><span class="p">;</span>
+
+    <span class="n">server</span><span class="p">::</span><span class="n">SharedPV</span> <span class="n">mypv</span><span class="p">(</span><span class="o">...</span><span class="p">);</span>
+    <span class="n">ioc</span><span class="p">::</span><span class="n">server</span><span class="p">()</span>
+          <span class="o">.</span><span class="n">addPV</span><span class="p">(</span><span class="s2">&quot;my:pv:name&quot;</span><span class="p">,</span> <span class="n">mypv</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">static</span> <span class="n">void</span> <span class="n">myregistrar</span><span class="p">()</span> <span class="p">{</span>
+    <span class="n">initHookRegister</span><span class="p">(</span><span class="o">&amp;</span><span class="n">myinitHook</span><span class="p">);</span>
+<span class="p">}</span>
+<span class="n">extern</span> <span class="s2">&quot;C&quot;</span> <span class="p">{</span>
+    <span class="n">epicsExportRegistrar</span><span class="p">(</span><span class="n">myregistrar</span><span class="p">);</span> <span class="o">//</span> <span class="n">needs</span> <span class="n">matching</span> <span class="n">entry</span> <span class="ow">in</span> <span class="o">.</span><span class="n">dbd</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+ <dl class="simple">
+<dt><strong>Exceptions</strong></dt><dd><ul class="breatheparameterlist simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">std::logic_error</span></code>: if called before instance is created, or after instance is destroyed.</p></li>
+</ul>
+</dd>
+</dl>
+</p>
+</dd></dl>
+
+</div>
+</div>
+<div class="section" id="qsrv-2">
+<span id="qsrv2"></span><h1>QSRV 2<a class="headerlink" href="#qsrv-2" title="Permalink to this headline">¶</a></h1>
+<p>Beginning with PVXS 1.2.0 the functionality of <a class="reference external" href="https://epics-base.github.io/pva2pva">QSRV</a>
+is replicated in the <code class="docutils literal notranslate"><span class="pre">pvxsIoc</span></code> library.
+Currently this feature preview is considered <strong>alpha</strong> level, with missing functionality.
+In addition to linking in <code class="docutils literal notranslate"><span class="pre">libpvxsIoc</span></code>,
+users must <strong>opt in</strong> at runtime by setting <code class="docutils literal notranslate"><span class="pre">$PVXS_QSRV_ENABLE=YES</span></code> before <code class="docutils literal notranslate"><span class="pre">iocInit()</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">epicsEnvSet</span><span class="p">(</span><span class="s2">&quot;PVXS_QSRV_ENABLE&quot;</span><span class="p">,</span> <span class="s2">&quot;YES&quot;</span><span class="p">)</span>
+<span class="n">iocInit</span><span class="p">()</span>
+</pre></div>
+</div>
+<p>The features of QSRV are divided into three broad categories.</p>
+<ul class="simple">
+<li><p>Single PV access</p></li>
+<li><p>Group PV access</p></li>
+<li><p>PVA Links</p></li>
+</ul>
+<div class="section" id="id1">
+<h2>IOC Shell<a class="headerlink" href="#id1" title="Permalink to this headline">¶</a></h2>
+<p>IOC Shell commands specific to database integration.</p>
+<dl class="cpp function">
+<dt id="_CPPv45pvxgliPKc">
+<span id="_CPPv35pvxgliPKc"></span><span id="_CPPv25pvxgliPKc"></span><span id="pvxgl__i.cCP"></span>void <code class="sig-name descname">pvxgl</code><span class="sig-paren">(</span>int <em>level</em>, <em class="property">const</em> char *<em>pattern</em><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv45pvxgliPKc" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Group PV information.  At detail level 0, lists Group names.
+Pattern restricts listing to only matching names.</p>
+</dd></dl>
+
+<dl class="cpp function">
+<dt id="_CPPv411dbLoadGroupPKcPKc">
+<span id="_CPPv311dbLoadGroupPKcPKc"></span><span id="_CPPv211dbLoadGroupPKcPKc"></span><span id="dbLoadGroup__cCP.cCP"></span>void <code class="sig-name descname">dbLoadGroup</code><span class="sig-paren">(</span><em class="property">const</em> char *<em>file</em>, <em class="property">const</em> char *<em>macros</em><span class="sig-paren">)</span><a class="headerlink" href="#_CPPv411dbLoadGroupPKcPKc" title="Permalink to this definition">¶</a><br /></dt>
+<dd><p>Load Group definitions from a separate JSON file.
+(as opposed to <code class="docutils literal notranslate"><span class="pre">info(Q:group,</span> <span class="pre">{...})</span></code> in a .db file)
+See <a class="reference internal" href="#groupjson"><span class="std std-ref">JSON Reference</span></a>.</p>
+</dd></dl>
+
+</div>
+<div class="section" id="single-pv">
+<h2>Single PV<a class="headerlink" href="#single-pv" title="Permalink to this headline">¶</a></h2>
+<p>When QSRV is enabled, access to individual/single PVs in the global process database
+is automatic and equivalent to the access provided by the Channel Access server
+in the IOC (aka. RSRV).</p>
+<p>So <code class="docutils literal notranslate"><span class="pre">caget</span> <span class="pre">pv:name</span></code> and <code class="docutils literal notranslate"><span class="pre">pvxget</span> <span class="pre">pv:name</span></code> should be functionally equivalent.</p>
+<p>Beginning with UNRELEASED, long string detection is automatic in some cases.
+eg. <code class="docutils literal notranslate"><span class="pre">.NAME</span></code> and <code class="docutils literal notranslate"><span class="pre">.INP</span></code>.
+In some situations adding a <code class="docutils literal notranslate"><span class="pre">$</span></code> suffix is still necessary when addressing
+a <code class="docutils literal notranslate"><span class="pre">DBF_STRING</span></code> or <code class="docutils literal notranslate"><span class="pre">DBF_*LINK</span></code> field to make it visible as a PVA string.
+It will not be necessary for clients to interpret a <code class="docutils literal notranslate"><span class="pre">char[]</span></code> as a “long string”.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span># eg.
+pvget some:record.NAME$
+pvget some:record.INP$
+</pre></div>
+</div>
+<p>An <code class="docutils literal notranslate"><span class="pre">info(Q:form,</span> <span class="pre">&quot;...&quot;)</span></code> may be used to set the <code class="docutils literal notranslate"><span class="pre">display.form</span></code> PVA meta-data hint
+which is used by some OPI clients.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">record</span><span class="p">(</span><span class="n">longin</span><span class="p">,</span> <span class="s2">&quot;my:bits&quot;</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">field</span><span class="p">(</span><span class="n">VAL</span><span class="p">,</span> <span class="s2">&quot;0x1234&quot;</span><span class="p">)</span>
+    <span class="n">info</span><span class="p">(</span><span class="n">Q</span><span class="p">:</span><span class="n">form</span><span class="p">,</span> <span class="s2">&quot;Hex&quot;</span><span class="p">)</span> <span class="c1"># hint to clients to render as hexadecimal</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>or:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">record</span><span class="p">(</span><span class="n">waveform</span><span class="p">,</span> <span class="s2">&quot;my:long:string&quot;</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">field</span><span class="p">(</span><span class="n">FTVL</span><span class="p">,</span> <span class="s2">&quot;CHAR&quot;</span><span class="p">)</span>
+    <span class="n">field</span><span class="p">(</span><span class="n">NELM</span><span class="p">,</span> <span class="s2">&quot;1024&quot;</span><span class="p">)</span>
+    <span class="n">info</span><span class="p">(</span><span class="n">Q</span><span class="p">:</span><span class="n">form</span><span class="p">,</span> <span class="s2">&quot;String&quot;</span><span class="p">)</span> <span class="c1"># hint to QSRV to expose char[] as string</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Currently supported format hints are:</p>
+<ul class="simple">
+<li><p>Default</p></li>
+<li><p>String</p></li>
+<li><p>Binary</p></li>
+<li><p>Decimal</p></li>
+<li><p>Hex</p></li>
+<li><p>Exponential</p></li>
+<li><p>Engineering</p></li>
+</ul>
+</div>
+<div class="section" id="group-pv">
+<h2>Group PV<a class="headerlink" href="#group-pv" title="Permalink to this headline">¶</a></h2>
+<p>By default no Group PVs are defined.</p>
+<p>A Group PV is a mapping values taken from one or more Single PVs to be composed into an overall structure.</p>
+<p>A Group is defined using a JSON syntax.
+Groups are defined with respect to a <em>Group Name</em>, which is also the PV name used when accessing the group.
+Unlike records, the “field” of a group have a different meaning than the fields of a record.
+Group field names are <em>not</em> part of the PV name.</p>
+<p>A group definition may be split among several records, or included in separate JSON file(s).
+For example of a group including two records is:</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">record</span><span class="p">(</span><span class="n">ai</span><span class="p">,</span> <span class="s2">&quot;rec:X&quot;</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">info</span><span class="p">(</span><span class="n">Q</span><span class="p">:</span><span class="n">group</span><span class="p">,</span> <span class="p">{</span>
+        <span class="s2">&quot;grp:name&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;X&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">+</span><span class="n">channel</span><span class="p">:</span><span class="s2">&quot;VAL&quot;</span><span class="p">}</span>
+        <span class="p">}</span>
+    <span class="p">})</span>
+<span class="p">}</span>
+<span class="n">record</span><span class="p">(</span><span class="n">ai</span><span class="p">,</span> <span class="s2">&quot;rec:Y&quot;</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">info</span><span class="p">(</span><span class="n">Q</span><span class="p">:</span><span class="n">group</span><span class="p">,</span> <span class="p">{</span>
+        <span class="s2">&quot;grp:name&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="s2">&quot;Y&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">+</span><span class="n">channel</span><span class="p">:</span><span class="s2">&quot;VAL&quot;</span><span class="p">}</span> <span class="o">//</span> <span class="o">.</span><span class="n">VAL</span> <span class="ow">in</span> <span class="n">enclosing</span> <span class="n">record</span><span class="p">()</span>
+        <span class="p">}</span>
+    <span class="p">})</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>Or equivalently with separate .db file and .json files.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="c1"># some .db</span>
+<span class="n">record</span><span class="p">(</span><span class="n">ai</span><span class="p">,</span> <span class="s2">&quot;rec:X&quot;</span><span class="p">)</span> <span class="p">{}</span>
+<span class="n">record</span><span class="p">(</span><span class="n">ai</span><span class="p">,</span> <span class="s2">&quot;rec:Y&quot;</span><span class="p">)</span> <span class="p">{}</span>
+<span class="c1"># in some .json</span>
+<span class="p">{</span>
+    <span class="s2">&quot;grp:name&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="s2">&quot;X&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">+</span><span class="n">channel</span><span class="p">:</span><span class="s2">&quot;rec:X.VAL&quot;</span><span class="p">},</span> <span class="o">//</span> <span class="n">full</span> <span class="n">PV</span> <span class="n">name</span>
+        <span class="s2">&quot;Y&quot;</span><span class="p">:</span> <span class="p">{</span><span class="o">+</span><span class="n">channel</span><span class="p">:</span><span class="s2">&quot;rec:Y.VAL&quot;</span><span class="p">}</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This group, named <code class="docutils literal notranslate"><span class="pre">grp:name</span></code>, has two group fields <code class="docutils literal notranslate"><span class="pre">X</span></code> and <code class="docutils literal notranslate"><span class="pre">Y</span></code>.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span>$ pvget grp:name
+grp:name
+structure
+    epics:nt/NTScalar:1.0 X
+        double value 0
+        alarm_t alarm INVALID DRIVER UDF
+        time_t timeStamp &lt;undefined&gt; 0
+...
+    epics:nt/NTScalar:1.0 Y
+        double value 0
+        alarm_t alarm INVALID DRIVER UDF
+        time_t timeStamp &lt;undefined&gt; 0
+...
+</pre></div>
+</div>
+</div>
+<div class="section" id="json-reference">
+<span id="groupjson"></span><h2>JSON Reference<a class="headerlink" href="#json-reference" title="Permalink to this headline">¶</a></h2>
+<p>A Group <a class="reference external" href="qsrv2-schema-0.json">JSON schema</a> definition file is available.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span>record(...) {
+    info(Q:group, {
+        &quot;&lt;group_name&gt;&quot;:{
+            +id:&quot;some/NT:1.0&quot;,  // top level ID
+            +atomic:true,       // whether monitors default to multi-locking atomicity
+            &quot;&lt;field.name&gt;&quot;:{
+                +type:&quot;scalar&quot;, // controls how map VAL mapped onto &lt;field.name&gt;
+                +channel:&quot;VAL&quot;,
+                +id:&quot;some/NT:1.0&quot;,
+                +trigger:&quot;*&quot;,   // &quot;*&quot; or comma seperated list of &lt;field.name&gt;s
+                +putorder:0,    // set for fields where put is allowed, processing done in increasing order
+            },
+            &quot;&quot;: {+type:&quot;meta&quot;, +channel:&quot;VAL&quot;} // special case adds meta-data fields at top level
+        }
+    })
+}
+</pre></div>
+</div>
+<p>Field mapping <code class="docutils literal notranslate"><span class="pre">+type</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">scalar</span></code> (default) places an NTScalar or NTScalarArray as a sub-structure.  (see <a class="reference internal" href="ntscalar.html#ntscalar"><span class="std std-ref">NTScalar and NTScalarArray</span></a>)</p></li>
+<li><dl class="simple">
+<dt><code class="docutils literal notranslate"><span class="pre">plain</span></code> ignores all meta-data and places only the “value” as a field.</dt><dd><p>The field placed will have the type of the <code class="docutils literal notranslate"><span class="pre">value</span></code> field of the equivalent NTScalar/NTScalarArray as a field.</p>
+</dd>
+</dl>
+</li>
+<li><p><code class="docutils literal notranslate"><span class="pre">any</span></code> places a variant union into which the “value” is stored.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">meta</span></code> places only the “alarm” and “timeStamp” fields of <code class="docutils literal notranslate"><span class="pre">scalar</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">structure</span></code> places only the associated <code class="docutils literal notranslate"><span class="pre">+id</span></code>.  Has no <code class="docutils literal notranslate"><span class="pre">+channel</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">proc</span></code> places no fields.  The associated <code class="docutils literal notranslate"><span class="pre">+channel</span></code> is processed on PUT.</p></li>
+</ul>
+<p><code class="docutils literal notranslate"><span class="pre">+channel</span></code>:</p>
+<p>When included in an <code class="docutils literal notranslate"><span class="pre">info(Q:group,</span> <span class="pre">...</span></code>, the <code class="docutils literal notranslate"><span class="pre">+channel</span></code> must only name a field of the enclosing record.
+(eg. <code class="docutils literal notranslate"><span class="pre">+channel:&quot;VAL&quot;</span></code>)
+When in a separate JSON file, <code class="docutils literal notranslate"><span class="pre">+channel</span></code> must be a full PV name, beginning with a record or alias name.
+(eg. <code class="docutils literal notranslate"><span class="pre">+channel:&quot;record:name.VAL&quot;</span></code>)</p>
+<p>Group <code class="docutils literal notranslate"><span class="pre">+trigger</span></code>:</p>
+<p>The field triggers define how changes to the constituent field are translated into a subscription update to the group.
+<code class="docutils literal notranslate"><span class="pre">+trigger</span></code> may be an empty string (<code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code>), a wildcard <code class="docutils literal notranslate"><span class="pre">&quot;*&quot;</span></code>, or a comma separated list of group field names.</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;&quot;</span></code> (the default) means that changes to the field do not cause a subscription update.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;*&quot;</span></code> causes a subscription update containing the most recent values/meta-data of all group fields.</p></li>
+<li><p>A comma separated list of field names causes an update with the most recent values of only the listed group fields.</p></li>
+</ul>
+</div>
+<div class="section" id="access-security">
+<h2>Access Security<a class="headerlink" href="#access-security" title="Permalink to this headline">¶</a></h2>
+<p>QSRV will enforce an optional access control policy file (<code class="docutils literal notranslate"><span class="pre">.acf</span></code>) loaded by <code class="docutils literal notranslate"><span class="pre">asSetFilename()</span></code>.
+This policy is applied to Single PVs just as RSRV does for Channel Access.
+With Group PVs, restrictions are not defined for the group, but rather for the individual member records.
+The same policy applies whether record is accessed individually, or through a group.</p>
+<p>Policy application differs from CA (RSRV) in several ways:</p>
+<p>Client hostname is always the numeric IP address.
+<code class="docutils literal notranslate"><span class="pre">HAG()</span></code> entries must either contained numeric IP addresses,
+or that <code class="docutils literal notranslate"><span class="pre">asCheckClientIP=1</span></code> flag must be set to translate hostnames into IPs on ACF file load (effects CA server as well).
+This prevents clients from trivially forging “hostname”.
+In additional to client usernames <code class="docutils literal notranslate"><span class="pre">UAG()</span></code> definitions may contained items beginning with <code class="docutils literal notranslate"><span class="pre">role/</span></code> which are matched against the list of local systems groups of which the client username is a member.
+Username to group lookup is done <em>locally</em> by QSRV, and depends on IOC host authentication configuration.
+Note that this is still based on the client provided username string.</p>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><span class="n">UAG</span><span class="p">(</span><span class="n">special</span><span class="p">)</span> <span class="p">{</span>
+    <span class="n">someone</span><span class="p">,</span> <span class="s2">&quot;role/op&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The “special” <code class="docutils literal notranslate"><span class="pre">UAG()</span></code> will match CA or PVA clients with the username “someone”.
+It will also match a PVA client if the “special” account exists locally,
+and is a member of the “op” group (supported on POSIX targets and Windows).</p>
+</div>
+<div class="section" id="pvaccess-links">
+<h2>PVAccess Links<a class="headerlink" href="#pvaccess-links" title="Permalink to this headline">¶</a></h2>
+<p>TODO…</p>
+</div>
+</div>
+
+
+          </div>
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">PVXS</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="guide.html">Guides</a></li>
+<li class="toctree-l1"><a class="reference internal" href="netconfig.html">PVA Network Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="example.html">Examples</a></li>
+<li class="toctree-l1"><a class="reference internal" href="building.html">Building from Source</a></li>
+<li class="toctree-l1"><a class="reference internal" href="building.html#including-pvxs-in-your-application">Including PVXS in your application</a></li>
+<li class="toctree-l1"><a class="reference internal" href="cli.html">Command Line Tools</a></li>
+<li class="toctree-l1"><a class="reference internal" href="value.html">Value Container API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="client.html">Client API</a></li>
+<li class="toctree-l1"><a class="reference internal" href="server.html">Server API</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">IOC Integration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#ioc-shell">IOC shell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#adding-custom-pvs-to-server">Adding custom PVs to Server</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#qsrv-2">QSRV 2</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id1">IOC Shell</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#single-pv">Single PV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#group-pv">Group PV</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#json-reference">JSON Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#access-security">Access Security</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#pvaccess-links">PVAccess Links</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="util.html">Misc</a></li>
+<li class="toctree-l1"><a class="reference internal" href="details.html">Details</a></li>
+<li class="toctree-l1"><a class="reference internal" href="releasenotes.html">Release Notes</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="source.html" title="previous chapter">Data Source</a></li>
+      <li>Next: <a href="util.html" title="next chapter">Misc</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2023 Michael Davidsaver and Osprey DCS LLC.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.4.3</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.8</a>
+      
+      |
+      <a href="_sources/ioc.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
