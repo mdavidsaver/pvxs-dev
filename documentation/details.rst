@@ -36,10 +36,91 @@ Additional information which may be relevant:
 If the module has built successfully, then running ``pvxinfo -D`` will
 report much of this information.
 
+Stack Trace with GDB
+--------------------
+
+When troubleshooting a crash or hung process, one important piece of information is a stack trace.
+On a Linux host, this is commonly acquired with `GDB <https://www.sourceware.org/gdb/>`_.
+Three scenarios are common:
+
+Running the process in GDB.  eg. ::
+
+    $ gdb --args ./bin/linux-x86_64/myioc st.cmd
+
+Alternately, if a crash has produced a core dump file. ::
+
+    $ gdb ./bin/linux-x86_64/myioc core
+
+Or to attach to a running process. ::
+
+    $ pgrep -l myioc
+    12345
+    $ gdb -p 12345
+
+All three scenarios should leave you at the GDB shell. ::
+
+    (gdb)
+
+The most useful commands to run at the GDB shell are: ::
+
+    (gdb) set pagination 0
+    (gdb) thread apply all backtrace
+
+In fact this can be combined with one of the three preceding incantations by
+prepending the following arguments: ::
+
+    $ gdb --nx --nw --batch -ex "set pagination 0" \
+      -ex 'thread apply all bt' ...
+
+GDB in a Linux Container
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Collecting a stack trace from a process running in a Linux container (docker, lxc, podman, etc.)
+presents special challenges as GDB needs to access files and processes in the target namespaces.
+Each container process has two difference PIDs, one in the root PID namespace, and a second in the target/container namespace.
+With the mount namespaces, the situation is even more complicated as the target may mount filesystems
+which are not accessible at all from the root mount namespace.
+
+Recent version of GDB claim to have native "seamless" support for linux namespaces
+where the above process should "just work" when run from the host (root) namespace.
+However the author has had limited success when attempting this w/ GDB < 13.
+Then, GDB must be run with root privilege,
+even when tracing an unprivileged container.
+
+Alternatively, if ``gdbserver`` can be installed into the target container,
+then the following recipes are possible.
+
+For the first two, it is necessary to identify a process in the target namespace.
+There are several ways to identify PID 1 in the target namespace,
+which is sufficient for the first two recipes.  ::
+
+    $ podman ps --ns
+    $ lsns
+
+Assuming the target PID 1 is 567 in the root namespace, run GDB in the root namespace. ::
+
+    $ gdb
+    (gdb) target extended-remote | \
+     nsenter -t 567 -U -p -m gdbserver --once - myioc ./st.cmd
+
+For the third, it is necessary to process in the both the root and targets namespaces.
+Circa Linux 6.1 this is possible with: ::
+
+    $ pgrep myioc
+    12345
+    $ grep NSpid /proc/12345/status
+    NSpid:  12345 15
+
+Now to attach to this process: ::
+
+    $ gdb
+    (gdb) target extended-remote | \
+     nsenter -t 12345 -U -p -m gdbserver --once --attach - 15
+
 Packet Capture
 --------------
 
-Some kinds of issues can be easily reproduced by the reporter, but not by others.
+Some kinds of issues can be easily reproduced, but not by others.
 eg. those related to interoperability, site private applications, or "environmental" conditions.
 In these cases it may be necessary to capture the troublesome network traffic to file.
 This section provides a quick guide for using `Wireshark <http://www.wireshark.org/>`_ to do this.
