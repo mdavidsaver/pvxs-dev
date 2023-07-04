@@ -7,6 +7,9 @@
  * MSVC preprocessor emits C comments in output
  */
 #endif
+#ifndef __has_include
+#  define __has_include(X) (0)
+#endif
 #define VERSION_INT(V,R,M,P) ( ((V)<<24) | ((R)<<16) | ((M)<<8) | (P))
 
 CONFIG_LOADED=YES
