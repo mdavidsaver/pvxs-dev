@@ -37,5 +37,8 @@ TOOLCHAIN: toolchain.c
 	$(CPP) $(CPPFLAGS) $(INCLUDES) ../toolchain.c > $@.tmp
 	$(CPP) $(CPPFLAGS) $(INCLUDES) ../probe-openssl.c > probe-openssl.out && echo "EVENT2_HAS_OPENSSL = YES" >> $@.tmp || echo "No OpenSSL"
 	$(MV) $@.tmp $@
+	$(ECHO) ">>> $@"
+	$(CAT) $@
+	$(ECHO) "<<< $@"
 
 endif
