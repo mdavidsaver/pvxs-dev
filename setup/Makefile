@@ -47,5 +47,8 @@ EXPAND_ARGS += "-DLIBEVENT_SYS_LIBS=$(_LIBEVENT_SYS_LIBS)"
 
 TOOLCHAIN_PVXS.$(T_A): ../TOOLCHAIN_PVXS.target@
 	$(EXPAND_TOOL) $(EXPAND_ARGS) $< $@
+	$(ECHO) ">>> $@"
+	$(CAT) $@
+	$(ECHO) "<<< $@"
 
 endif
