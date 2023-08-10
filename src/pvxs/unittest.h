@@ -212,10 +212,14 @@ testCase testArrEq(const char *sLHS, const LHS& lhs, const char *sRHS, const RHS
 /** Assert that an exception is thrown.
  *
  * @tparam Exception The exception type which should be thrown
- * @param fn A callable
+ * @param fn A callable which should throw the Exception type.
+ * @param chk Optional.  If provided, a callable which takes an Exception
+ *        reference and returns a true if it is as expected.
  *
  * @returns A testCase which passes if an Exception instance was caught,
  *          and false otherwise (wrong type, or no exception).
+ *
+ * @since UNRELEASED Added second (chk) argument.
  *
  * @code
  * testThrows<std::runtime_error>([]() {
@@ -224,16 +228,26 @@ testCase testArrEq(const char *sLHS, const LHS& lhs, const char *sRHS, const RHS
  *      testShow()<<"Now you don't";
  * })<<"some message";
  * @endcode
+ *
+ * @code
+ * testThrows<std::runtime_error>([]() {
+ *      testShow()<<"Now you see me";
+ *      throw std::runtime_error("I happened");
+ *      testShow()<<"Now you don't";
+ * }, [](std::runtime_error& e) -> bool {
+ *      return strstr(e.what(), "happened");
+ * })<<"some message";
+ * @endcode
  */
-template<class Exception, typename FN>
-testCase testThrows(FN fn)
+template<class Exception, typename FN, typename CHK = bool(*)(Exception&)>
+testCase testThrows(FN fn, CHK chk = nullptr)
 {
     testCase ret(false);
     try {
         fn();
         ret<<"Unexpected success - ";
     }catch(Exception& e){
-        ret.setPass(true)<<"Expected exception \""<<e.what()<<"\" - ";
+        ret.setPass(!chk || chk(e))<<"Expected exception \""<<e.what()<<"\" - ";
     }catch(std::exception& e){
         ret<<"Unexpected exception "<<typeid(e).name()<<" \""<<e.what()<<"\" - ";
     }
