@@ -140,6 +140,16 @@ then the last mapped record in that chain should have ``+trigger: "*"``.
           However, this situation will almost never give desired behaviour as changes to records which
           could otherwise be atomic will be split into multiple subscription updates.
 
+Mapping ``+putorder``:
+
+``+putorder`` must be set for a field to be writable through a group PV.
+When more than one mapping has an order defined, the numeric value is used to define
+the order in which the associated records are processed (in increasing order).
+
+Additionally, the values of ``+putorder`` also control the order of fields in the group PV definition.
+This control is necessary only in limited cases, such as the ``NTTable`` specification,
+where the iteration order of fields must match the order of the ``labels`` array.
+
 Understanding Groups
 ====================
 
@@ -180,7 +190,7 @@ and on the right the output of ``pvget TST:Tbl``.
 
 .. raw:: html
 
-   <hr>
+   <hr/>
 
 .. image:: _image/nt_table1.svg
 
@@ -196,7 +206,7 @@ With ``+type: "plain"``, this appears as a string array ("string[]").
 
 .. raw:: html
 
-   <hr>
+   <hr/>
 
 .. image:: _image/nt_table2.svg
 
@@ -210,7 +220,7 @@ Processing occurs in order of increasing ``+putorder``.
 
 .. raw:: html
 
-   <hr>
+   <hr/>
 
 .. image:: _image/nt_table3.svg
 
@@ -222,7 +232,7 @@ fields ``alarm`` and ``timeStamp``.
 
 .. raw:: html
 
-   <hr>
+   <hr/>
 
 .. image:: _image/nt_table4.svg
 
