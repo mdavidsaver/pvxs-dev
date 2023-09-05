@@ -569,6 +569,10 @@ public:
 
     //! Test if this field is marked as valid/changed
     bool isMarked(bool parents=true, bool children=false) const;
+    //! Return true if (sub)fields are marked in both structures.
+    //! @pre this->equalType(other)
+    //! @since UNRELEASED
+    bool isMarkedOverlap(const Value& other) const;
     //! return *this if isMarked()==true, or a !valid() ref. if false.
     Value ifMarked(bool parents=true, bool children=false) const;
     //! Mark this field as valid/changed

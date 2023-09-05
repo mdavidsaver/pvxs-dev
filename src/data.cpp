@@ -261,6 +261,27 @@ Value Value::ifMarked(bool parents, bool children) const
     return ret;
 }
 
+bool Value::isMarkedOverlap(const Value& other) const
+{
+    if(!desc || desc!=other.desc)
+        throw std::logic_error(SB()<<__func__<<" Values must have the same non-NULL type");
+
+    if(store->valid && store->valid)
+        return true;
+
+    if(desc->code==TypeCode::Struct) {
+        for(auto& it : desc->mlookup) {
+            auto lhs = store.get()+it.second;
+            auto rhs = other.store.get()+it.second;
+
+            if(lhs->valid && rhs->valid)
+                return true;
+        }
+    }
+
+    return false;
+}
+
 void Value::mark(bool v)
 {
     if(!desc)

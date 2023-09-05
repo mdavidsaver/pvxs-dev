@@ -491,11 +491,42 @@ void testClear()
     testFalse(val.isMarked(true, true));
 }
 
+void testMarkedOverlap()
+{
+    testShow()<<__func__;
+
+    auto lhs = TypeDef(TypeCode::Struct, {
+                           members::UInt32("int"),
+                           members::String("string"),
+                           members::UInt32A("arr"),
+                           members::Any("any"),
+                       }).create();
+
+    auto rhs = lhs.cloneEmpty();
+
+    testFalse(lhs.isMarkedOverlap(lhs));
+    testFalse(lhs.isMarkedOverlap(rhs));
+
+    lhs["int"].mark();
+    lhs["arr"].mark();
+
+    testTrue(lhs.isMarkedOverlap(lhs));
+    testFalse(lhs.isMarkedOverlap(rhs));
+
+    rhs["string"].mark();
+
+    testFalse(lhs.isMarkedOverlap(rhs));
+
+    rhs["int"].mark();
+
+    testTrue(lhs.isMarkedOverlap(rhs));
+}
+
 } // namespace
 
 MAIN(testdata)
 {
-    testPlan(156);
+    testPlan(162);
     testSetup();
     testTraverse();
     testAssign();
@@ -550,6 +581,7 @@ MAIN(testdata)
     testUnionMagicAssign();
     testExtract();
     testClear();
+    testMarkedOverlap();
     cleanup_for_valgrind();
     return testDone();
 }
