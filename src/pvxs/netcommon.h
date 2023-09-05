@@ -164,6 +164,19 @@ struct PVXS_API ConfigCommon {
      */
     static
     bool has_tls_support();
+
+    /** Is this host able, and permitted, to use PVA over IPv6?
+     *
+     * Considers conditions including:
+     *
+     * - libc support (AF_INET6 defined?)
+     * - OS Kernel support (Can create AF_INET6 socket?)
+     * - Host network configuration (can bind() to "::1")
+     * - "$PVXS_ENABLE_IPV6" unset or "YES"
+     *  @since UNRELEASED
+     */
+    static
+    bool can_ipv6();
 };
 
 } // namespace impl

@@ -32,6 +32,11 @@ namespace pvxs {
 namespace impl {
 ConfigCommon::~ConfigCommon() {}
 
+bool ConfigCommon::can_ipv6() {
+    SockAttach sa;
+    return evsocket::canIPv6;
+}
+
 bool has_tls_support() {
 #ifdef PVXS_ENABLE_OPENSSL
     return true;
