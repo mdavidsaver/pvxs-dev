@@ -26,6 +26,6 @@ DIRS += test
 test_DEPEND_DIRS = src ioc
 
 DIRS += example
-example_DEPEND_DIRS = src
+example_DEPEND_DIRS = src ioc
 
 include $(TOP)/configure/RULES_TOP

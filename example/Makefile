@@ -9,6 +9,7 @@ include $(TOP)/configure/CONFIG
 #=============================
 
 PROD_LIBS += pvxs Com
+LIB_LIBS += pvxs Com
 
 TESTPROD_HOST += simplesrv
 simplesrv_SRCS += simplesrv.cpp
@@ -30,6 +31,10 @@ rpc_server_SRCS += rpc_server.cpp
 
 TESTPROD_HOST += rpc_client
 rpc_client_SRCS += rpc_client.cpp
+
+TESTLIBRARY += ttable
+ttable_SRCS += ttable.cpp
+ttable_LIBS += pvxsIoc
 
 #===========================
 
