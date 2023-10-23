@@ -20,6 +20,14 @@ NoField::NoField()
 
 NoField::~NoField() {}
 
+#ifdef __GNUC__
+NoConvert::NoConvert(const std::string& msg,
+                     const char *file,
+                     int line)
+    :std::runtime_error(SB()<<file<<':'<<line<<':'<<msg)
+{}
+#endif
+
 NoConvert::~NoConvert() {}
 
 LookupError::LookupError(const std::string& msg)
