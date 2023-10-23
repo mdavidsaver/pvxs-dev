@@ -477,8 +477,14 @@ struct PVXS_API NoField : public std::runtime_error
 //! Thrown when a Value can not be converted to the requested type
 struct PVXS_API NoConvert : public std::runtime_error
 {
+#ifdef __GNUC__
+    NoConvert(const std::string& msg,
+              const char *file = __builtin_FILE(),
+              int line = __builtin_LINE());
+#else
     NoConvert(const std::string& msg) : std::runtime_error(msg) {}
-    virtual ~NoConvert();
+#endif
+        virtual ~NoConvert();
 };
 
 struct PVXS_API LookupError : public std::runtime_error
