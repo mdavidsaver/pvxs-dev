@@ -143,6 +143,11 @@ struct PVXS_API ConfigCommon {
      */
     std::string tls_keychain_file;
 
+    /** Path to PEM encoded CRL file.
+     *  @since UNRELEASED
+     */
+    std::string tls_crl_file;
+
     /** Client certificate request during TLS handshake.
      *
      *  - Default.   Currently equivalent to Optional
