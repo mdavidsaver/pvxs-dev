@@ -49,6 +49,10 @@ struct ssl_delete<X509> {
     inline void operator()(X509* fp) { if(fp) X509_free(fp); }
 };
 template<>
+struct ssl_delete<X509_CRL> {
+    inline void operator()(X509_CRL* fp) { if(fp) X509_CRL_free(fp); }
+};
+template<>
 struct ssl_delete<STACK_OF(X509)> {
     inline void operator()(STACK_OF(X509)* fp) { if(fp) sk_X509_free(fp); }
 };
@@ -215,6 +219,25 @@ ossl_setup_common(const SSL_METHOD *method, bool ssl_client, const impl::ConfigC
     // we mandate TLS >= 1.3
     (void)SSL_CTX_set_min_proto_version(ctx.ctx, TLS1_3_VERSION);
     (void)SSL_CTX_set_max_proto_version(ctx.ctx, 0); // up to max.
+
+    if(!conf.tls_crl_file.empty()) {
+        std::unique_ptr<FILE> fp(fopen(conf.tls_crl_file.c_str(), "rb"));
+        if(!fp) {
+            auto err = errno;
+            throw std::runtime_error(SB()<<"Unable to open \""<<conf.tls_crl_file<<"\" : "<<strerror(err));
+        }
+
+        ossl_ptr<X509_CRL> crl;
+        if(!d2i_X509_CRL_fp(fp.get(), crl.acquire()))
+            throw SSLError(SB()<<"Unable to read \""<<conf.tls_crl_file<<"\"");
+
+        auto trusted = SSL_CTX_get_cert_store(ctx.ctx);
+        if(!X509_STORE_add_crl(trusted, crl.get()))
+            throw SSLError(SB()<<"Unable to process \""<<conf.tls_crl_file<<"\"");
+
+        log_debug_printf(_setup, "Read CRL (PEM) %s\n",
+                         conf.tls_crl_file.c_str());
+    }
 
     if(!conf.tls_keychain_file.empty()) {
         std::string keychain, password;
