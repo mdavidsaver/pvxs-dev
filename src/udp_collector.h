@@ -55,6 +55,7 @@ struct PVXS_API UDPManager
         uint32_t searchID=0;
         uint8_t peerVersion=0;
         bool protoTCP = false; // included protocol "tcp"
+        bool protoTLS = false;
         bool mustReply=false;
         struct Name {
             const char *name;
@@ -114,6 +115,10 @@ public:
 
     void start(bool s=true);
     inline void stop() { start(false); }
+
+    bool operator<(const UDPListener& o) const {
+        return dest < o.dest;
+    }
 };
 
 }} // namespace pvxs::impl

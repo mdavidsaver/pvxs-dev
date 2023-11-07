@@ -183,23 +183,29 @@ private:
 public:
     virtual void cleanup() override final;
 private:
-    //void bevEvent(short events);
+    virtual void bevEvent(short events) override final;
     virtual void bevWrite() override final;
 };
 
 struct ServIface
 {
     server::Server::Pvt * const server;
+    const bool isTLS;
 
+    // const after ctor
     SockAddr bind_addr;
     std::string name;
 
     evsocket sock;
     evlisten listener;
 
-    ServIface(const SockAddr &addr, server::Server::Pvt *server, bool fallback);
+    ServIface(const SockAddr &addr, server::Server::Pvt *server, bool fallback, bool isTLS);
 
     static void onConnS(struct evconnlistener *listener, evutil_socket_t sock, struct sockaddr *peer, int socklen, void *raw);
+
+    bool operator<(const ServIface& o) const {
+        return bind_addr < o.bind_addr;
+    }
 };
 
 
@@ -246,12 +252,12 @@ struct Server::Pvt
     // accept new connections and send beacons
     evbase acceptor_loop;
 
-    std::list<std::unique_ptr<UDPListener> > listeners;
+    std::set<std::unique_ptr<UDPListener> > listeners;
     // destination address, and whether last sendto() succeeded
     std::vector<std::pair<SockEndpoint, bool>> beaconDest;
     std::vector<SockAddr> ignoreList;
 
-    std::list<ServIface> interfaces;
+    std::set<ServIface> interfaces;
     std::map<ServerConn*, std::shared_ptr<ServerConn> > connections;
 
     evsocket beaconSender4, beaconSender6;
@@ -274,6 +280,10 @@ struct Server::Pvt
         Running,
         Stopping,
     } state;
+
+#ifdef PVXS_ENABLE_OPENSSL
+    ossl::SSLContext tls_context;
+#endif
 
     INST_COUNTER(ServerPvt);
 
