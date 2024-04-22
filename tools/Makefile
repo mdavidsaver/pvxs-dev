@@ -13,6 +13,8 @@ USR_CPPFLAGS += -I$(TOP)/src
 
 PROD_LIBS += pvxs Com
 
+PROD_SRCS += cliutil.cpp
+
 PROD += pvxvct
 pvxvct_SRCS += pvxvct.cpp
 
@@ -36,6 +38,18 @@ pvxlist_SRCS += list.cpp
 
 PROD += pvxmshim
 pvxmshim_SRCS += mshim.cpp
+
+# tests of CLI tools
+
+TESTPROD_HOST += testcliutil
+testcliutil_SRCS += testcliutil.cpp
+TESTS += testcliutil
+
+TESTPROD_HOST += testxput
+testxput_SRCS += testxput.cpp
+TESTS += testxput
+
+TESTSCRIPTS_HOST += $(TESTS:%=%.t)
 
 #===========================
 
