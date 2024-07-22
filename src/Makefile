@@ -115,6 +115,8 @@ LIB_SRCS += clientget.cpp
 LIB_SRCS += clientmon.cpp
 LIB_SRCS += clientdiscover.cpp
 
+LIB_SRCS_Linux += nlsock.cpp
+
 ifeq (YES,$(EVENT2_HAS_OPENSSL))
 LIB_SRCS += ossl.cpp
 endif

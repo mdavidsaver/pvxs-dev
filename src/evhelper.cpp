@@ -390,6 +390,10 @@ evsocket::evsocket(int af, evutil_socket_t sock, bool blocking)
 #endif
         throw std::system_error(err, std::system_category());
     }
+#ifdef AF_NETLINK
+    if(af==AF_NETLINK) {}
+    else
+#endif
     if(af!=AF_INET && af!=AF_INET6) {
         evutil_closesocket(sock);
         throw std::logic_error("Unsupported address family");

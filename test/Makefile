@@ -119,6 +119,10 @@ TESTPROD_HOST += testudpfwd
 testudpfwd_SRCS += testudpfwd.cpp
 TESTS += testudpfwd
 
+#TESTPROD_Linux += testnlsock
+#testnlsock_SRCS += testnlsock.cpp
+#TESTSCRIPTS_Linux += testnlsock.t
+
 ifdef BASE_3_15
 ifeq (YES,$(EVENT2_HAS_OPENSSL))
 TESTPROD_HOST += gen_test_certs
