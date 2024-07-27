@@ -233,8 +233,10 @@ void ServerConn::handle_SEARCH()
             nreply++;
     }
 
-    if(nreply==0 && !mustReply && !foundtcp && !foundtls)
-        return;
+    if(!(foundtcp || foundtls))
+        return; // no supported protocol, can't reply
+    if(nreply==0 && !mustReply)
+        return; // no result, and no forced reply
 
     {
         (void)evbuffer_drain(txBody.get(), evbuffer_get_length(txBody.get()));

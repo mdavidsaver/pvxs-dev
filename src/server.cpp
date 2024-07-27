@@ -823,9 +823,12 @@ void Server::Pvt::onSearch(const UDPManager::Search& msg)
             nreply++;
     }
 
+    if(!(msg.protoTCP || msg.protoTLS))
+        return; // no supported protocol, can't reply
+
     // "pvlist" breaks unless we honor mustReply flag
-    if(nreply==0 && !msg.mustReply && (msg.protoTCP || msg.protoTLS))
-        return;
+    if(nreply==0 && !msg.mustReply)
+        return; // no result, and no forced reply
 
     VectorOutBuf M(true, searchReply);
 
