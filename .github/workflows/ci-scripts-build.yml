@@ -104,25 +104,28 @@ jobs:
             cmp: gcc
             configuration: default
             base: "7.0"
-            libevent: "release-2.0.22-stable"
+            libevent: "release-2.1.12-stable"
 
           - name: Native Linux with 7.0.2
             os: ubuntu-latest
             cmp: gcc
             configuration: default
             base: "R7.0.2"
+            extra: "CMD_CPPFLAGS=\"-U_FORTIFY_SOURCE\""
 
           - name: Native Linux with 3.15
             os: ubuntu-latest
             cmp: gcc
             configuration: default
             base: "3.15"
+            extra: "CMD_CPPFLAGS=\"-U_FORTIFY_SOURCE\""
 
           - name: Native Linux with 3.14
             os: ubuntu-latest
             cmp: gcc
             configuration: default
             base: "3.14"
+            extra: "CMD_CPPFLAGS=\"-U_FORTIFY_SOURCE\""
 
           - name: OSX
             os: macos-latest
