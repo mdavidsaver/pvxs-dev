@@ -13,11 +13,11 @@
 namespace pvxs {namespace impl {
 
 // message related to client state and errors
-DEFINE_LOGGER(connsetup, "pvxs.tcp.setup");
+DEFINE_LOGGER(connsetup, "pvxs.tcp.init");
 // related to low level send/recv
 DEFINE_LOGGER(connio, "pvxs.tcp.io");
 
-DEFINE_LOGGER(serversearch, "pvxs.server.search");
+DEFINE_LOGGER(serversearch, "pvxs.svr.search");
 
 ServerChan::ServerChan(const std::shared_ptr<ServerConn> &conn,
                        uint32_t sid,
@@ -183,16 +183,21 @@ void ServerConn::handle_SEARCH()
     M.skip(3 + 16 + 2, __FILE__, __LINE__); // unused and replyAddr (we always and only reply to TCP peer)
 
     bool foundtcp = false;
+#ifdef PVXS_ENABLE_OPENSSL
     bool foundtls = false;
+#endif
     Size nproto{0};
     from_wire(M, nproto);
     for(size_t i=0; i<nproto.size && !foundtcp && M.good(); i++) {
         std::string proto;
         from_wire(M, proto);
+#ifndef PVXS_ENABLE_OPENSSL
         if(proto=="tcp")
             foundtcp = true;
-#ifdef PVXS_ENABLE_OPENSSL
-        else if(proto=="tls" && iface->server->tls_context && iface->server->effective.tls_port)
+#else
+        if(proto=="tcp" && iface->server->canRespondToTcpSearch() )
+            foundtcp = true;
+        else if(proto=="tls" && iface->server->canRespondToTlsSearch())
             foundtls = true;
 #endif
     }
@@ -233,7 +238,10 @@ void ServerConn::handle_SEARCH()
             nreply++;
     }
 
-    if(nreply==0 && !mustReply && !foundtcp && !foundtls)
+    if(nreply==0 && !mustReply && !foundtcp )
+#ifdef PVXS_ENABLE_OPENSSL
+      if (!foundtls)
+#endif
         return;
 
     {
@@ -244,11 +252,14 @@ void ServerConn::handle_SEARCH()
         _to_wire<12>(R, iface->server->effective.guid.data(), false, __FILE__, __LINE__);
         to_wire(R, searchID);
         to_wire(R, SockAddr::any(AF_INET));
+#ifdef PVXS_ENABLE_OPENSSL
         if(foundtls) {
             to_wire(R, iface->server->effective.tls_port);
             to_wire(R, "tls"); // prefer TLS
 
-        } else if(foundtcp) {
+        } else
+#endif
+        if(foundtcp) {
             to_wire(R, iface->server->effective.tcp_port);
             to_wire(R, "tcp");
         }
@@ -309,6 +320,7 @@ void ServerConn::handle_CREATE_CHANNEL()
 
             for(auto& pair : iface->server->sources) {
                 try {
+                    auto source = pair.second;
                     pair.second->onCreate(std::move(op));
                     const char* msg = nullptr;
 

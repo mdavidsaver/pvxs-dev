@@ -103,7 +103,7 @@ struct ThreadEvent
         return evt;
     }
 
-    inline epicsEvent* operator->() { return get(); }
+    epicsEvent* operator->() { return get(); }
 };
 
 namespace {
@@ -310,6 +310,25 @@ bool evbase::_dispatch(mfunction&& fn, bool dothrow) const
 
     timeval now{};
     if(empty && event_add(pvt->dowork.get(), &now))
+        throw std::runtime_error("Unable to wakeup dispatch()");
+
+    return true;
+}
+
+bool evbase::_delayedDispatch(timeval delay, mfunction&& fn, bool dothrow) const {
+    bool empty;
+    {
+        Guard G(pvt->lock);
+        if(!pvt->running) {
+            if(dothrow)
+                throw std::logic_error("Worker stopped");
+            return false;
+        }
+        empty = pvt->actions.empty();
+        pvt->actions.emplace_back(std::move(fn), nullptr, nullptr);
+    }
+
+    if(empty && event_add(pvt->dowork.get(), &delay))
         throw std::runtime_error("Unable to wakeup dispatch()");
 
     return true;

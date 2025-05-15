@@ -18,9 +18,13 @@
 #include <epicsVersion.h>
 #include <epicsEvent.h>
 #include <epicsGetopt.h>
+#include <openssl.h>
 #include <osiSock.h>
 
 #include <pvxs/log.h>
+#ifdef PVXS_ENABLE_OPENSSL
+#include <pvxs/sslinit.h>
+#endif
 #include <pvxs/util.h>
 
 #include <udp_collector.h>
@@ -81,9 +85,9 @@ void usage(const char *name)
 {
     std::cerr<<"Usage: "<<name<<" [-C|-S] [-B hostip[:port]] [-H hostip]\n"
                "\n"
-               "PV Access Virtual Cable Tester\n"
+               "PVAccess Virtual Cable Tester\n"
                "\n"
-               "Assist in troubleshooting network (mis)configuration by listening\n"
+               "Assist in troubleshooting network configuration / misconfiguration by listening\n"
                "for (some) PVA client/server UDP traffic.\n"
                "\n"
                "  -h               Print this message\n"
@@ -101,6 +105,9 @@ void usage(const char *name)
 int main(int argc, char *argv[])
 {
     try {
+#ifdef PVXS_ENABLE_OPENSSL
+        pvxs::ossl::sslInit();
+#endif
         // group options used from callback
         struct {
             bool verbose = false;

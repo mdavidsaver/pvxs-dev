@@ -45,14 +45,18 @@ public:
                    const Credentials& credentials,
                    const SecurityClient& securityClient)
         :pfieldsave(pDbChannel->addr.pfield)
-        ,pvt(asTrapWriteWithData((securityClient.cli)[0], // The user is the first element
-                         credentials.cred[0].c_str(),     // The user is the first element
-                         credentials.host.c_str(),
-                         pDbChannel,
-                         dbChannelFinalFieldType(pDbChannel),
-                         dbChannelFinalElements(pDbChannel),
-                         nullptr
-                 ))
+        ,pvt(asTrapWriteBeforeWithIdentityData(
+            (ASIDENTITY){
+                .user = credentials.cred[0].c_str(),
+                .host = (char *)credentials.host.c_str(),
+                .method =  credentials.method.c_str(),
+                .authority = credentials.authority.c_str(),
+                .protocol = AS_PROTOCOL_TLS },
+            pDbChannel,
+            dbChannelFinalFieldType(pDbChannel),
+            dbChannelFinalElements(pDbChannel),
+            nullptr
+        ))
     {
         /* asTrapWrite callbacks may have called clobbered
          * see

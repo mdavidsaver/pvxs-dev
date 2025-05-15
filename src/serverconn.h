@@ -7,21 +7,24 @@
 #ifndef SERVERCONN_H
 #define SERVERCONN_H
 
+#include <atomic>
 #include <list>
 #include <map>
 #include <memory>
-#include <atomic>
 
 #include <epicsEvent.h>
 
 #include <pvxs/server.h>
-#include <pvxs/source.h>
 #include <pvxs/sharedpv.h>
-#include "evhelper.h"
-#include "utilpvt.h"
-#include "dataimpl.h"
-#include "udp_collector.h"
+#include <pvxs/source.h>
+
+#include "certstatus.h"
+#include "certstatusmanager.h"
 #include "conn.h"
+#include "dataimpl.h"
+#include "evhelper.h"
+#include "udp_collector.h"
+#include "utilpvt.h"
 
 namespace pvxs {namespace impl {
 
@@ -132,6 +135,9 @@ struct ServerConn final : public ConnBase, public std::enable_shared_from_this<S
 
     const std::shared_ptr<ServerChan>& lookupSID(uint32_t sid);
 
+#ifdef PVXS_ENABLE_OPENSSL
+    ossl::CertStatusExData *getCertStatusExData() override;
+#endif
 private:
 #define CASE(Op) virtual void handle_##Op() override final;
     CASE(ECHO);
@@ -168,7 +174,9 @@ private:
 struct ServIface
 {
     server::Server::Pvt * const server;
+#ifdef PVXS_ENABLE_OPENSSL
     const bool isTLS;
+#endif
 
     SockAddr bind_addr;
     std::string name;
@@ -209,6 +217,7 @@ struct Server::Pvt
     SockAttach attach;
 
     std::weak_ptr<Server::Pvt> internal_self;
+    Server &server;
 
     // "const" after ctor
     Config effective;
@@ -224,11 +233,26 @@ struct Server::Pvt
     // accept new connections and send beacons
     evbase acceptor_loop;
 
+#ifdef PVXS_ENABLE_OPENSSL
+    // @note order member `pvxs::client::ContextImpl::connections` after
+    //      `pvxs::client::ContextImpl::tls_context` so that
+    //       destruction order will be `connections`'s `ServerConn`
+    //       then `tls_context`'s `SSL_CTX ctx`.
+    //       ~ServerConn() will clean up ALL the `SSLPeerStatusAndMonitor`s
+    //       stored in `CertStatusExData` which is attached to the SSL_CTX,
+    //       so that by time SSL_CTX is freed there won't be any peer statuses
+    //       left
+    // @brief the server's tls context object
+    std::shared_ptr<ossl::SSLContext> tls_context;
+#endif
+
+    // The server listeners (@see pvxs::client::ContextImpl::tls_context)
     std::list<std::unique_ptr<UDPListener> > listeners;
     std::vector<SockEndpoint> beaconDest;
     std::vector<SockAddr> ignoreList;
 
     std::list<ServIface> interfaces;
+    // The server connections (@see pvxs::client::ContextImpl::tls_context)
     std::map<ServerConn*, std::shared_ptr<ServerConn> > connections;
 
     evsocket beaconSender4, beaconSender6;
@@ -253,21 +277,42 @@ struct Server::Pvt
     } state;
 
 #ifdef PVXS_ENABLE_OPENSSL
-    ossl::SSLContext tls_context;
+    CustomServerCallback custom_server_callback;
+    evevent custom_server_callback_timer;
+    ossl_ptr<uint8_t> cached_ocsp_response;
+    time_t cached_ocsp_status_date;
 #endif
 
     INST_COUNTER(ServerPvt);
 
+#ifndef PVXS_ENABLE_OPENSSL
     Pvt(const Config& conf);
+#else
+    Pvt(Server &server, const Config& conf, CustomServerCallback custom_cert_event_callback = nullptr);
+#endif
     ~Pvt();
 
     void start();
     void stop();
 
-private:
+    bool canRespondToTcpSearch() const { return !tls_context || tls_context->state >= ossl::SSLContext::DegradedMode; }
+    bool canRespondToTlsSearch() const { return tls_context && tls_context->state >= ossl::SSLContext::TcpReady && effective.tls_port; }
+    bool isInDegradedMode() const { return !tls_context || tls_context->state <= ossl::SSLContext::DegradedMode; }
+
+   private:
     void onSearch(const UDPManager::Search& msg);
     void doBeacons(short evt);
     static void doBeaconsS(evutil_socket_t fd, short evt, void *raw);
+
+#ifdef PVXS_ENABLE_OPENSSL
+    static void doCustomServerCallback(evutil_socket_t fd, short evt, void* raw);
+
+    bool isContextReadyForTls() const { return tls_context && tls_context->state == ossl::SSLContext::TlsReady; }
+
+  public:
+    void removePeerTlsConnections(const ServerConn* server_conn = nullptr);
+    void enableTlsForPeerConnection(const ServerConn* server_conn = nullptr);
+#endif
 };
 
 }} // namespace pvxs::server

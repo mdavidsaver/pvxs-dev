@@ -9,8 +9,8 @@
 #include "utilpvt.h"
 #include "clientimpl.h"
 
-DEFINE_LOGGER(setup, "pvxs.client.setup");
-DEFINE_LOGGER(io, "pvxs.client.io");
+DEFINE_LOGGER(setup, "pvxs.cli.init");
+DEFINE_LOGGER(io, "pvxs.cli.io");
 
 namespace pvxs {
 namespace client {
@@ -22,7 +22,7 @@ Discovery::Discovery(const std::shared_ptr<ContextImpl> &context)
 
 Discovery::~Discovery() {
     if(loop.assertInRunningLoop())
-        _cancel(true);
+        _cancel();
 }
 
 bool Discovery::cancel()
@@ -30,14 +30,14 @@ bool Discovery::cancel()
     decltype (notify) junk;
     bool ret;
     loop.call([this, &junk, &ret](){
-        ret = _cancel(false);
+        ret = _cancel();
         junk = std::move(notify);
         // leave opByIOID for GC
     });
     return ret;
 }
 
-bool Discovery::_cancel(bool implicit) {
+bool Discovery::_cancel() {
     bool active = running;
 
     if(active) {
@@ -82,7 +82,7 @@ std::shared_ptr<Operation> DiscoverBuilder::exec()
 
     context->tcp_loop.dispatch([op, context, ping]() {
 
-        if(context->state!=ContextImpl::Running)
+        if(!context->isRunning())
             throw std::logic_error("Context close()d");
 
         bool first = context->discoverers.empty();

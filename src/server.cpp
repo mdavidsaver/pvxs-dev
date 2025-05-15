@@ -4,51 +4,79 @@
  * in file LICENSE that is included with this distribution.
  */
 
-
+#include <atomic>
+#include <cstdlib>
+#include <functional>
 #include <list>
 #include <map>
 #include <system_error>
-#include <functional>
-#include <atomic>
-#include <cstdlib>
-
-#include <signal.h>
 
 #include <dbDefs.h>
 #include <envDefs.h>
-#include <epicsThread.h>
-#include <epicsTime.h>
 #include <epicsGuard.h>
 #include <epicsString.h>
+#include <epicsThread.h>
+#include <epicsTime.h>
+#include <signal.h>
 
-#include <pvxs/server.h>
 #include <pvxs/client.h>
+#include <pvxs/config.h>
 #include <pvxs/log.h>
+#include <pvxs/server.h>
+#include <pvxs/sharedpv.h>
+#include <pvxs/sharedwildcardpv.h>
+
+#include "certstatusmanager.h"
 #include "evhelper.h"
 #include "serverconn.h"
-#include "utilpvt.h"
 #include "udp_collector.h"
+#include "utilpvt.h"
 
 namespace pvxs {
 namespace impl {
 ReportInfo::~ReportInfo() {}
-}
+}  // namespace impl
 namespace server {
 using namespace impl;
 
-DEFINE_LOGGER(serversetup, "pvxs.server.setup");
-DEFINE_LOGGER(serverio, "pvxs.server.io");
-DEFINE_LOGGER(serversearch, "pvxs.server.search");
+DEFINE_LOGGER(serversetup, "pvxs.svr.init");
+DEFINE_LOGGER(osslsetup, "pvxs.ossl.init");
+DEFINE_LOGGER(watcher, "pvxs.certs.mon");
+DEFINE_LOGGER(serverio, "pvxs.svr.io");
+DEFINE_LOGGER(serversearch, "pvxs.svr.search");
 
 // mimic pvAccessCPP server (almost)
 // send a "burst" of beacons, then fallback to a longer interval
 static constexpr timeval beaconIntervalShort{15, 0};
 static constexpr timeval beaconIntervalLong{180, 0};
 
+#ifndef PVXS_ENABLE_OPENSSL
 Server Server::fromEnv()
 {
     return Config::fromEnv().build();
 }
+#else
+Server Server::fromEnv(const bool tls_disabled, const ConfigCommon::ConfigTarget target)
+{
+    return Config::fromEnv(tls_disabled, target).build();
+}
+
+Server Server::fromEnv(CustomServerCallback &custom_event_callback, const bool tls_disabled, const ConfigCommon::ConfigTarget target)
+{
+    return Config::fromEnv(tls_disabled, target).build(custom_event_callback);
+}
+
+Server::Server(const Config &conf, CustomServerCallback custom_event_callback) {
+    auto internal(std::make_shared<Pvt>(*this, conf, custom_event_callback));
+    internal->internal_self = internal;
+
+    // external
+    pvt.reset(internal.get(), [internal](Pvt*) mutable {
+        auto trash(std::move(internal));
+        trash->stop();
+    });
+}
+#endif
 
 Server::Server(const Config& conf)
 {
@@ -63,7 +91,7 @@ Server::Server(const Config& conf)
      * Which need to safely access server storage, but should not
      * prevent a server from stopping.
      */
-    auto internal(std::make_shared<Pvt>(conf));
+    auto internal(std::make_shared<Pvt>(*this, conf));
     internal->internal_self = internal;
 
     // external
@@ -71,6 +99,7 @@ Server::Server(const Config& conf)
         auto trash(std::move(internal));
         trash->stop();
     });
+
     // we don't keep a weak_ptr to the external reference.
     // Caller is entirely responsible for keeping this server running
 }
@@ -148,59 +177,6 @@ std::vector<std::pair<std::string, int> > Server::listSource()
     return names;
 }
 
-void Server::reconfigure(const Config& inconf)
-{
-    if(!pvt)
-        throw std::logic_error("NULL Server");
-
-    auto newconf(inconf);
-    newconf.expand(); // maybe catch some errors early
-
-    log_info_printf(serversetup, "Reconfigure%s", "\n");
-
-    // is the current server running?
-
-    Pvt::state_t prev_state;
-    pvt->acceptor_loop.call([this, &prev_state]() {
-        prev_state = pvt->state;
-    });
-
-    bool was_running = prev_state==Pvt::Running || prev_state==Pvt::Starting;
-
-    if(was_running)
-        pvt->stop();
-
-    decltype(pvt->sources) transfers;
-    decltype(pvt->builtinsrc) builtin;
-
-    // copy all Source, including builtin
-    {
-        auto G(pvt->sourcesLock.lockReader());
-
-        transfers = pvt->sources;
-        builtin = pvt->builtinsrc;
-    }
-
-    // completely destroy the current/old server to free up TCP ports
-    pvt.reset();
-
-    // build up a new, empty, server
-    Server newsrv(newconf);
-    pvt = std::move(newsrv.pvt);
-
-    {
-        auto G(pvt->sourcesLock.lockWriter());
-
-        pvt->sources = transfers;
-        pvt->builtinsrc = builtin;
-    }
-
-    if(was_running) {
-        pvt->start();
-        log_info_printf(serversetup, "Resume%s", "\n");
-    }
-}
-
 const Config& Server::config() const
 {
     if(!pvt)
@@ -215,18 +191,34 @@ client::Config Server::clientConfig() const
         throw std::logic_error("NULL Server");
 
     client::Config ret;
-    // do not copy tls_keychain_file
+    // do not copy tls_cert_file
     ret.udp_port = pvt->effective.udp_port;
     ret.tcp_port = pvt->effective.tcp_port;
-    ret.tls_port = pvt->effective.tls_port;
     ret.interfaces = pvt->effective.interfaces;
     ret.addressList = pvt->effective.interfaces;
     ret.autoAddrList = false;
+
+#ifdef PVXS_ENABLE_OPENSSL
+    ret.tls_port = pvt->effective.tls_port;
+    ret.tls_disabled = pvt->effective.tls_disabled;
+    ret.tls_disable_status_check = pvt->effective.tls_disable_status_check;
+    ret.tls_disable_stapling = pvt->effective.tls_disable_stapling;
+#endif
+    ret.is_initialized = true;
 
     return ret;
 }
 
 Server& Server::addPV(const std::string& name, const SharedPV& pv)
+{
+    if(!pvt)
+        throw std::logic_error("NULL Server");
+    pvt->builtinsrc.add(name, pv);
+    pvt->beaconChange++;
+    return *this;
+}
+
+Server& Server::addPV(const std::string& name, const SharedWildcardPV& pv)
 {
     if(!pvt)
         throw std::logic_error("NULL Server");
@@ -379,12 +371,12 @@ std::ostream& operator<<(std::ostream& strm, const Server& serv)
             strm<<"\n";
 
 #ifdef PVXS_ENABLE_OPENSSL
-            if(serv.pvt->tls_context) {
-                auto cert(serv.pvt->tls_context.certificate0());
+            if (serv.pvt->tls_context->ctx) {
+                auto cert(serv.pvt->tls_context->getEntityCertificate());
                 assert(cert);
-                strm<<indent{}<<"TLS Cert. "<<ossl::ShowX509{cert}<<"\n";
+                strm << indent{} << "TLS Cert. " << ossl::ShowX509{cert} << "\n";
             } else {
-                strm<<indent{}<<"TLS Cert. not loaded\n";
+                strm << indent{} << "TLS Cert. not loaded\n";
             }
 #else
             strm<<indent{}<<"TLS Support not enabled\n";
@@ -399,7 +391,9 @@ std::ostream& operator<<(std::ostream& strm, const Server& serv)
                     <<" backlog="<<conn->backlog.size()
                     <<" TX="<<conn->statTx<<" RX="<<conn->statRx
                     <<" auth="<<conn->cred->method
-                    <<(conn->iface->isTLS ? " TLS" : "")
+#ifdef PVXS_ENABLE_OPENSSL
+                  <<(conn->iface->isTLS ? " TLS" : "")
+#endif
                     <<"\n";
 
                 if(detail<=2)
@@ -409,11 +403,10 @@ std::ostream& operator<<(std::ostream& strm, const Server& serv)
 
                 strm<<indent{}<<"Cred: "<<*conn->cred<<"\n";
 #ifdef PVXS_ENABLE_OPENSSL
-                if(conn->iface->isTLS && conn->connection()) {
-                    auto ctx = bufferevent_openssl_get_ssl(conn->connection());
+                if (conn->iface->isTLS && conn->connection()) {
+                    const auto ctx = bufferevent_openssl_get_ssl(conn->connection());
                     assert(ctx);
-                    if(auto cert = SSL_get0_peer_certificate(ctx))
-                        strm<<indent{}<<"Cert: "<<ossl::ShowX509{cert}<<"\n";
+                    if (const auto cert = SSL_get0_peer_certificate(ctx)) strm << indent{} << "Cert: " << ossl::ShowX509{cert} << "\n";
                 }
 #endif
 
@@ -455,27 +448,48 @@ std::ostream& operator<<(std::ostream& strm, const Server& serv)
     return strm;
 }
 
-Server::Pvt::Pvt(const Config &conf)
-    :effective(conf)
-    ,beaconMsg(128)
-    ,acceptor_loop("PVXTCP", epicsThreadPriorityCAServerLow-2)
-    ,beaconSender4(AF_INET, SOCK_DGRAM, 0)
-    ,beaconSender6(AF_INET6, SOCK_DGRAM, 0)
-    ,beaconTimer(__FILE__, __LINE__,
-                 event_new(acceptor_loop.base, -1, EV_TIMEOUT, doBeaconsS, this))
-    ,searchReply(0x10000)
-    ,builtinsrc(StaticSource::build())
-    ,state(Stopped)
+#ifndef PVXS_ENABLE_OPENSSL
+Server::Pvt::Pvt(Server& server, const Config& conf)
+#else
+Server::Pvt::Pvt(Server &svr, const Config& conf, CustomServerCallback custom_cert_event_callback)
+#endif
+    : server(svr),
+      effective(conf),
+      beaconMsg(128),
+      acceptor_loop("PVXTCP", epicsThreadPriorityCAServerLow - 2),
+#ifdef PVXS_ENABLE_OPENSSL
+      tls_context(nullptr),
+#endif
+      beaconSender4(AF_INET, SOCK_DGRAM, 0),
+      beaconSender6(AF_INET6, SOCK_DGRAM, 0),
+      beaconTimer(__FILE__, __LINE__, event_new(acceptor_loop.base, -1, EV_TIMEOUT, doBeaconsS, this)),
+      searchReply(0x10000),
+      builtinsrc(StaticSource::build()),
+      state(Stopped)
+#ifdef PVXS_ENABLE_OPENSSL
+      ,
+      custom_server_callback(custom_cert_event_callback),
+      custom_server_callback_timer(__FILE__, __LINE__, event_new(acceptor_loop.base, -1, EV_TIMEOUT, doCustomServerCallback, this))
+#endif
 {
     effective.expand();
 
 #ifdef PVXS_ENABLE_OPENSSL
-    if(!effective.tls_keychain_file.empty()) {
+    if (effective.isTlsConfigured()) {
         try {
-            tls_context = ossl::SSLContext::for_server(effective);
-        }catch(std::exception& e){
-            log_err_printf(serversetup, "Unable to setup TLS.  Disabled for server : %s\n", e.what());
+            tls_context = ossl::SSLContext::for_server(effective, acceptor_loop);
+        } catch (std::exception& e) {
+            if (effective.tls_stop_if_no_cert) {
+                log_err_printf(osslsetup, "***EXITING***: TLS disabled for server: %s\n", e.what());
+                exit(1);
+            }
+            if (effective.tls_throw_if_no_cert) {
+                throw(std::runtime_error(e.what()));
+            }
+            log_warn_printf(osslsetup, "TLS disabled for server: %s\n", e.what());
         }
+    } else if (tls_context) {
+        tls_context->setDegradedMode(true);
     }
 #endif
 
@@ -582,40 +596,38 @@ Server::Pvt::Pvt(const Config &conf)
 #ifdef PVXS_ENABLE_OPENSSL
         decltype(tcpifaces) tlsifaces(tcpifaces); // copy before any setPort()
 #endif
+            bool firstiface = true;
+            for (auto& addr : tcpifaces) {
+                if (addr.port() == 0) addr.setPort(effective.tcp_port);
 
-        bool firstiface = true;
-        for(auto& addr : tcpifaces) {
-            if(addr.port()==0)
-                addr.setPort(effective.tcp_port);
+                interfaces.emplace_back(addr, this, firstiface, false);
 
-            interfaces.emplace_back(addr, this, firstiface, false);
-
-            if(firstiface || effective.tcp_port==0)
-                effective.tcp_port = interfaces.back().bind_addr.port();
-            firstiface = false;
-        }
-
-#ifdef PVXS_ENABLE_OPENSSL
-        if(tls_context) {
-            firstiface = true;
-            for(auto& addr : tlsifaces) {
-                // unconditionally set port to avoid clash with plain TCP listener
-                addr.setPort(effective.tls_port);
-
-                interfaces.emplace_back(addr, this, firstiface, true);
-
-                if(firstiface || effective.tls_port==0)
-                    effective.tls_port = interfaces.back().bind_addr.port();
+                if (firstiface || effective.tcp_port == 0) effective.tcp_port = interfaces.back().bind_addr.port();
                 firstiface = false;
             }
-        }
+
+#ifdef PVXS_ENABLE_OPENSSL
+            // Set this up as long as TLS is configured, even if its configured badly
+            // or if the certificates are invalid, because the state may change and
+            // we may need to listen for TLS traffic once it does
+            if (effective.isTlsConfigured()) {
+                firstiface = true;
+                for (auto& addr : tlsifaces) {
+                    // unconditionally set port to avoid clash with plain TCP listener
+                    addr.setPort(effective.tls_port);
+
+                    interfaces.emplace_back(addr, this, firstiface, true);
+
+                    if (firstiface || effective.tls_port == 0) effective.tls_port = interfaces.back().bind_addr.port();
+                    firstiface = false;
+                }
+            }
 #endif
 
-        for(const auto& addr : effective.beaconDestinations) {
-            beaconDest.emplace_back(addr.c_str(), &effective);
-            log_debug_printf(serversetup, "Will send beacons to %s\n",
-                             std::string(SB()<<beaconDest.back()).c_str());
-        }
+            for (const auto& addr : effective.beaconDestinations) {
+                beaconDest.emplace_back(addr.c_str(), &effective);
+                log_debug_printf(serversetup, "Will send beacons to %s\n", std::string(SB() << beaconDest.back()).c_str());
+            }
     });
 
     {
@@ -627,37 +639,60 @@ Server::Pvt::Pvt(const Config &conf)
         } pun{};
         static_assert (sizeof(pun)==12, "");
 
-        // seed with some randomness to avoid making UUID a vector
-        // for information disclosure
-        evutil_secure_rng_get_bytes((char*)pun.b.data(), sizeof(pun.b));
+        #ifdef PVXS_ENABLE_OPENSSL
+        if (effective.config_target == ConfigCommon::CMS) {
+            // For PVACMS, generate a deterministic GUID based on "pvacms/cluster"
+            const std::string input = "pvacms/cluster";
 
-        // i[0] (start) time
-        epicsTimeStamp now;
-        epicsTimeGetCurrent(&now);
-        pun.i[0] ^= now.secPastEpoch ^ now.nsec;
+            // Simple deterministic hash function
+            for (size_t idx = 0; idx < input.size(); idx++) {
+                pun.b[idx % pun.b.size()] ^= input[idx];
+                // Rotate bits to spread the entropy
+                if ((idx + 1) % 4 == 0) {
+                    uint32_t& val = pun.i[idx / 4];
+                    val = (val << 13) | (val >> 19);
+                }
+            }
 
-        // i[1] host
-        // mix together first interface and all local bcast addresses
-        pun.i[1] ^= ntohl(osiLocalAddr(dummy.sock).ia.sin_addr.s_addr);
-        for(auto& addr : dummy.broadcasts()) {
-            if(addr.family()==AF_INET)
-                pun.i[1] ^= ntohl(addr->in.sin_addr.s_addr);
-        }
+            // Add some fixed bits to ensure uniqueness from random GUIDs
+            pun.b[0] |= 0x80; // Set high bit to mark as deterministic
+            pun.b[11] = 0x42; // Magic number for PVACMS
+        } else
+            // Original random GUID generation for non-PVACMS servers
+        #endif
+        {
+            // seed with some randomness to avoid making UUID a vector
+            // for information disclosure
+            evutil_secure_rng_get_bytes((char*)pun.b.data(), sizeof(pun.b));
 
-        // i[2] process on host
+            // i[0] (start) time
+            epicsTimeStamp now;
+            epicsTimeGetCurrent(&now);
+            pun.i[0] ^= now.secPastEpoch ^ now.nsec;
+
+            // i[1] host
+            // mix together first interface and all local bcast addresses
+            pun.i[1] ^= ntohl(osiLocalAddr(dummy.sock).ia.sin_addr.s_addr);
+            for(auto& addr : dummy.broadcasts()) {
+                if(addr.family()==AF_INET)
+                    pun.i[1] ^= ntohl(addr->in.sin_addr.s_addr);
+            }
+
+            // i[2] process on host
 #if defined(_WIN32)
-        pun.i[2] ^= GetCurrentProcessId();
+            pun.i[2] ^= GetCurrentProcessId();
 #elif !defined(__rtems__) && !defined(vxWorks)
-        pun.i[2] ^= getpid();
+            pun.i[2] ^= getpid();
 #else
-        pun.i[2] ^= 0xdeadbeef;
+            pun.i[2] ^= 0xdeadbeef;
 #endif
-        // and a bit of server instance within this process
-        pun.i[2] ^= uint32_t(effective.tcp_port)<<16u;
-        // maybe a little bit of randomness (eg. ASLR on Linux)
-        pun.i[2] ^= size_t(this);
-        if(sizeof(size_t)>4)
-            pun.i[2] ^= size_t(this)>>32u;
+            // and a bit of server instance within this process
+            pun.i[2] ^= uint32_t(effective.tcp_port)<<16u;
+            // maybe a little bit of randomness (eg. ASLR on Linux)
+            pun.i[2] ^= size_t(this);
+            if(sizeof(size_t)>4)
+                pun.i[2] ^= size_t(this)>>32u;
+        }
 
         std::copy(pun.b.begin(), pun.b.end(), effective.guid.begin());
     }
@@ -697,13 +732,16 @@ void Server::Pvt::start()
                 log_err_printf(serversetup, "Error enabling listener on %s\n", iface.name.c_str());
             }
             log_debug_printf(serversetup, "Server enabled%s listener on %s\n",
-                             iface.isTLS ? " TLS" : "", iface.name.c_str());
+#ifdef PVXS_ENABLE_OPENSSL
+                               iface.isTLS ? " TLS" :
+#endif
+                              "", iface.name.c_str());
         }
     });
     if(prev_state!=Stopped)
         return;
 
-    // being processing Searches
+    // begin processing Searches
     for(auto& L : listeners) {
         L->start();
     }
@@ -719,12 +757,28 @@ void Server::Pvt::start()
         state = Running;
     });
 
-
+    // begin running custom server callback if configured
+   if ( custom_server_callback )
+       acceptor_loop.call([this]()
+       {
+            // Trigger the first custom server callback, with the initial interval period
+            if(event_add(custom_server_callback_timer.get(), &kCustomCallbackIntervalInitial))
+                log_err_printf(serversetup, "Error enabling file monitor\n%s", "");
+       });
 }
 
 void Server::Pvt::stop()
 {
     log_debug_printf(serversetup, "Server Stopping\n%s", "");
+
+    acceptor_loop.call([this]()
+    {
+        if (custom_server_callback_timer) {
+            if (event_del(custom_server_callback_timer.get()))
+                log_warn_printf(serversetup, "Error disabling custom server callback timer\n%s", "");
+        }
+
+    });
 
     // Stop sending Beacons
     state_t prev_state;
@@ -738,7 +792,7 @@ void Server::Pvt::stop()
         state = Stopping;
 
         if(event_del(beaconTimer.get()))
-            log_err_printf(serversetup, "Error disabling beacon timer on\n%s", "");
+            log_err_printf(serversetup, "Error disabling beacon timer\n%s", "");
     });
     if(prev_state!=Running)
         return;
@@ -824,8 +878,16 @@ void Server::Pvt::onSearch(const UDPManager::Search& msg)
     }
 
     // "pvlist" breaks unless we honor mustReply flag
-    if(nreply==0 && !msg.mustReply && (msg.protoTCP || msg.protoTLS))
-        return;
+    if (nreply == 0 && !msg.mustReply) {
+#ifdef PVXS_ENABLE_OPENSSL
+        if ((!msg.protoTCP || !canRespondToTcpSearch()) && (!msg.protoTLS || !canRespondToTlsSearch()))
+#else
+        if (msg.protoTCP || msg.protoTLS)
+#endif
+        {
+            return;
+        }
+    }
 
     VectorOutBuf M(true, searchReply);
 
@@ -835,15 +897,19 @@ void Server::Pvt::onSearch(const UDPManager::Search& msg)
     to_wire(M, msg.searchID);
     to_wire(M, SockAddr::any(AF_INET));
 #ifdef PVXS_ENABLE_OPENSSL
-    if(msg.protoTLS && tls_context && effective.tls_port) {
-        to_wire(M, uint16_t(effective.tls_port));
+    if (msg.protoTLS && canRespondToTlsSearch()) {
+        to_wire(M, effective.tls_port);
         to_wire(M, "tls");
-    } else
-#endif
-    { // protoTCP
+    } else if ((nreply == 0 && msg.mustReply) || (msg.protoTCP && canRespondToTcpSearch())) {
+        to_wire(M, effective.tcp_port);
+        to_wire(M, "tcp");
+    }
+#else
+    {  // protoTCP
         to_wire(M, uint16_t(effective.tcp_port));
         to_wire(M, "tcp");
     }
+#endif
     // "found" flag
     to_wire(M, uint8_t(nreply!=0 ? 1 : 0));
 
@@ -935,6 +1001,133 @@ void Server::Pvt::doBeaconsS(evutil_socket_t fd, short evt, void *raw)
         log_exc_printf(serverio, "Unhandled error in beacon timer callback: %s\n", e.what());
     }
 }
+
+#ifdef PVXS_ENABLE_OPENSSL
+void Server::Pvt::doCustomServerCallback(evutil_socket_t fd, short evt, void* raw) {
+    try {
+        const auto pvt = static_cast<Pvt*>(raw);
+        if (pvt && pvt->custom_server_callback) {
+            auto next_timeval = pvt->custom_server_callback(evt);
+            if (next_timeval.tv_sec == 0 && next_timeval.tv_usec == 0) {
+                next_timeval = kCustomCallbackInterval;
+            }
+            if (next_timeval.tv_sec > 0 || next_timeval.tv_usec > 0) {
+                if (event_add(pvt->custom_server_callback_timer.get(), &next_timeval))
+                    log_err_printf(serverio, "Error re-enabling custom server callback%s\n", "");
+            }
+        }
+    } catch (std::exception& e) {
+        log_err_printf(serverio, "Unhandled error in custom server callback: %s\n", e.what());
+    }
+}
+
+void Server::reconfigure(const Config& inconf) {
+    if (!pvt) throw std::logic_error("NULL Server");
+
+    auto newconf(inconf);
+    newconf.expand();  // maybe catch some errors early
+
+    log_info_printf(serversetup, "Reconfiguring Server Context%s", "\n");
+
+    // is the current server running?
+
+    Pvt::state_t prev_state;
+    pvt->acceptor_loop.call([this, &prev_state]() { prev_state = pvt->state; });
+
+    bool was_running = prev_state == Pvt::Running || prev_state == Pvt::Starting;
+
+    if (was_running) pvt->stop();
+
+    decltype(pvt->sources) transfers;
+    decltype(pvt->builtinsrc) builtin;
+
+    // copy all Source, including builtin
+    {
+        auto G(pvt->sourcesLock.lockReader());
+
+        transfers = pvt->sources;
+        builtin = pvt->builtinsrc;
+    }
+
+    // completely destroy the current/old server to free up TCP ports
+    pvt.reset();
+
+    // build up a new, empty, server
+    try {
+        Server newsrv(newconf);
+        pvt = std::move(newsrv.pvt);
+    } catch (std::exception& e) {
+        log_warn_printf(serversetup, "Server Reconfiguration failed: %s\n", e.what());
+    }
+
+    {
+        auto G(pvt->sourcesLock.lockWriter());
+
+        pvt->sources = transfers;
+        pvt->builtinsrc = builtin;
+    }
+
+    if (was_running) {
+        pvt->start();
+        log_info_printf(serversetup, "Resuming Server after Reconfiguration%s", "\n");
+    }
+}
+
+/**
+ * @brief Enable TLS for the given server peer connection
+ *
+ * This is called when a peer subscription monitor reports a status of GOOD for a peer certificate.
+ * It works by simply removing the specified connection and waiting for it to be
+ * reconnected again as TLS.  This time the peer credential status will already be cached so
+ * will be validated immediately
+ *
+ * @param server_conn the peer connection to enable TLS for
+ */
+void Server::Pvt::enableTlsForPeerConnection(const ServerConn* server_conn) {
+    // Find the connection to clean-up
+    std::vector<std::weak_ptr<ServerConn>> to_cleanup;
+    for (auto& pair : connections) {
+        auto conn = pair.first;
+        if (conn && !conn->iface->isTLS && (!server_conn || conn == server_conn)) {
+            to_cleanup.push_back(pair.second);
+        }
+    }
+
+    log_debug_printf(watcher, "Closing %zu TCP connections\n", to_cleanup.size());
+
+    // Clean it up
+    for (auto& weak_conn : to_cleanup) {
+        auto conn = weak_conn.lock();
+        if (conn) conn->cleanup();
+    }
+}
+
+/**
+ * @brief Remove one or more peer TLS connections so that it will reconnect in degraded mode
+ *
+ * @param server_conn optionally specified peer server connection to remove
+ */
+void Server::Pvt::removePeerTlsConnections(const ServerConn* server_conn) {
+    // Collect tls connections to clean-up
+    std::vector<std::weak_ptr<ServerConn>> to_cleanup;
+    for (auto& pair : connections) {
+        auto conn = pair.first;
+        if (conn && conn->iface->isTLS && (!server_conn || conn == server_conn)) {
+            to_cleanup.push_back(pair.second);
+        }
+    }
+
+    log_debug_printf(watcher, "Closing %zu TLS connections\n", to_cleanup.size());
+
+    // Clean them up
+    for (auto& weak_conn : to_cleanup) {
+        auto conn = weak_conn.lock();
+        if (conn) {
+            conn->cleanup();
+        }
+    }
+}
+#endif
 
 Source::~Source() {}
 

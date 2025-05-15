@@ -14,6 +14,10 @@
 
 #include <pvxs/client.h>
 #include <pvxs/log.h>
+#ifdef PVXS_ENABLE_OPENSSL
+#include <pvxs/sslinit.h>
+#endif
+
 #include "utilpvt.h"
 #include "evhelper.h"
 
@@ -39,6 +43,9 @@ void usage(const char* argv0)
 int main(int argc, char *argv[])
 {
     try {
+#ifdef PVXS_ENABLE_OPENSSL
+        ossl::sslInit();
+#endif
         logger_config_env(); // from $PVXS_LOG
         double timeout = 5.0;
         bool verbose = false;
@@ -68,7 +75,7 @@ int main(int argc, char *argv[])
                     break;
                 default:
                     usage(argv[0]);
-                    std::cerr<<"\nUnknown argument: "<<char(opt)<<std::endl;
+                    std::cerr<<"\nUnknown argument: -"<<char(optopt)<<std::endl;
                     return 1;
                 }
             }
@@ -104,10 +111,13 @@ int main(int argc, char *argv[])
         }
 
 
-        auto ctxt(client::Context::fromEnv());
+        // Get the timeout from the environment and build the context
+        auto conf = client::Config::fromEnv();
+        conf.request_timeout_specified = timeout;
+        auto ctxt = conf.build();
 
         if(verbose)
-            std::cout<<"Effective config\n"<<ctxt.config();
+            std::cout<<"Effective config\n"<<conf;
 
         epicsEvent done;
         int ret=0;
