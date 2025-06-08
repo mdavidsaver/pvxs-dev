@@ -268,6 +268,8 @@ struct Server::Pvt
     RWLock sourcesLock;
     std::map<std::pair<int, std::string>, std::shared_ptr<Source> > sources;
 
+    client::Context associatedClient;
+
     enum state_t {
         Stopped,
         Starting,
@@ -277,6 +279,9 @@ struct Server::Pvt
 
 #ifdef PVXS_ENABLE_OPENSSL
     ossl::SSLContext tls_context;
+    std::shared_ptr<client::Subscription> self_cert_status_sub;
+    bool self_cert_valid = true;
+    evevent self_cert_valid_until;
 #endif
 
     INST_COUNTER(ServerPvt);
@@ -290,7 +295,9 @@ struct Server::Pvt
 private:
     void onSearch(const UDPManager::Search& msg);
     void doBeacons(short evt);
+    void doValidUntil();
     static void doBeaconsS(evutil_socket_t fd, short evt, void *raw);
+    static void doValidUntilS(evutil_socket_t fd, short evt, void *raw);
 };
 
 }} // namespace pvxs::server
