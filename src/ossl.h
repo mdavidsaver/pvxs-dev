@@ -43,6 +43,7 @@ std::ostream& operator<<(std::ostream& strm, const ShowX509& cert);
 
 struct SSLContext {
     SSL_CTX *ctx = nullptr;
+    std::string cert_status_pv;
 
     PVXS_API
     static

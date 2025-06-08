@@ -65,10 +65,15 @@ constexpr int ossl_verify_depth = 5;
 // see NOTE in "man SSL_CTX_set_alpn_protos"
 const unsigned char pva_alpn[] = "\x05pva/1";
 
+#define NID_SPvaCertStatusURIID "1.3.6.1.4.1.37427.1"
+#define SN_SPvaCertStatusURI "ASN.1 - SPvaCertStatusURI"
+#define LN_SPvaCertStatusURI "EPICS SPVA Certificate Status URI"
+
 struct OSSLGbl {
     ossl_ptr<OSSL_LIB_CTX> libctx;
     int SSL_CTX_ex_idx;
     int SSL_ex_idx;
+    int OBJ_SPvaCertStatusURI;
 #ifdef PVXS_ENABLE_SSLKEYLOGFILE
     ossl_ptr<FILE> keylog;
     epicsMutex keylock;
@@ -179,6 +184,9 @@ void OSSLGbl_init()
                                            new_SSL_sidecar,
                                            dup_SSL_sidecar,
                                            free_SSL_sidecar);
+    gbl->OBJ_SPvaCertStatusURI = OBJ_create(NID_SPvaCertStatusURIID, SN_SPvaCertStatusURI, LN_SPvaCertStatusURI);
+    if(gbl->OBJ_SPvaCertStatusURI==NID_undef)
+        throw SSLError("Unable to allocate OBJ_SPvaCertStatusURI");
 #ifdef PVXS_ENABLE_SSLKEYLOGFILE
     auto keylog = getenv("SSLKEYLOGFILE");
     if(keylog && keylog[0]) {
@@ -499,6 +507,22 @@ ossl_setup_common(const SSL_METHOD *method, bool ssl_client, const impl::ConfigC
 
             if(!SSL_CTX_build_cert_chain(ctx.ctx, SSL_BUILD_CHAIN_FLAG_UNTRUSTED)) // SSL_BUILD_CHAIN_FLAG_CHECK
                 throw SSLError("invalid cert chain");
+
+            auto idx(X509_get_ext_by_NID(car->cert.get(), ossl_gbl->OBJ_SPvaCertStatusURI, -1));
+            if(idx>=0) {
+                auto ext(X509_get_ext(car->cert.get(), idx));
+                assert(ext); // previously found
+
+                const auto ext_data = X509_EXTENSION_get_data(ext);
+                assert(ext_data); // extension always has data
+
+                if(auto name = reinterpret_cast<const char*>(ASN1_STRING_get0_data(ext_data))) {
+
+                    ctx.cert_status_pv = std::string(name, name+ ASN1_STRING_length(ext_data));
+                    if(!ctx.cert_status_pv.empty())
+                        log_debug_printf(_setup, "My status from: %s\n", ctx.cert_status_pv.c_str());
+                }
+            }
         }
     }
 
