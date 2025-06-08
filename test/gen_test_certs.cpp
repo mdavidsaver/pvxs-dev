@@ -13,6 +13,7 @@
 #include <type_traits>
 #include <vector>
 
+#include <openssl/asn1.h>
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
@@ -23,6 +24,13 @@
 #include <openssl/err.h>
 
 #include <epicsGetopt.h>
+
+#define NID_SPvaCertStatusURIID "1.3.6.1.4.1.37427.1"
+#define SN_SPvaCertStatusURI "ASN.1 - SPvaCertStatusURI"
+#define LN_SPvaCertStatusURI "EPICS SPVA Certificate Status URI"
+
+static
+const X509V3_EXT_METHOD foo = {};
 
 namespace {
 // cleanup hooks for use with std::unique_ptr
@@ -190,6 +198,37 @@ PKCS12 *PKCS12_create_ex2(const char *pass, const char *name, EVP_PKEY *pkey,
 }
 #endif // NID_oracle_jdk_trustedkeyusage
 
+void* s2i_CertStatusPV(const X509V3_EXT_METHOD *method,
+                      X509V3_CTX *ctx,
+                      const char *str) noexcept
+{
+    // need to cast away const-ness of method circa openssl 3.0 :(
+    return s2i_ASN1_UTF8STRING((X509V3_EXT_METHOD*)method, ctx, str);
+}
+
+X509V3_EXT_METHOD CertStatusPV = {
+    NID_undef, // dynamic allocation below
+    0,
+    ASN1_ITEM_ref(ASN1_UTF8STRING),
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    &s2i_CertStatusPV,
+};
+void CertStatusPVSetup() {
+    if(CertStatusPV.ext_nid!=NID_undef)
+        return;
+
+    CertStatusPV.ext_nid = OBJ_create(NID_SPvaCertStatusURIID, SN_SPvaCertStatusURI, LN_SPvaCertStatusURI);
+    if(CertStatusPV.ext_nid == NID_undef)
+        throw SSLError("Unable to create OBJ_SPvaCertStatusURI");
+
+    if(!X509V3_EXT_add(&CertStatusPV))
+        throw SSLError("X509V3_EXT_add");
+}
+
 /* Understanding X509_EXTENSION in openssl...
  * Each NID_* has a corresponding const X509V3_EXT_METHOD
  * in a crypto/x509/v3_*.c which defines the expected type of the void* value arg.
@@ -208,6 +247,8 @@ PKCS12 *PKCS12_create_ex2(const char *pass, const char *name, EVP_PKEY *pkey,
 void add_extension(X509* cert, int nid, const char *expr,
                    const X509* subject = nullptr, const X509* issuer = nullptr)
 {
+    CertStatusPVSetup();
+
     X509V3_CTX xctx; // well, this is different...
     X509V3_set_ctx_nodb(&xctx);
     X509V3_set_ctx(&xctx, const_cast<X509*>(issuer), const_cast<X509*>(subject), nullptr, nullptr, 0);
@@ -360,6 +401,7 @@ struct CertCreator {
     // extensions
     const char *key_usage = nullptr;
     const char *extended_key_usage = nullptr;
+    std::string cert_status_pv;
     // Cert. Authority
     bool isCA = false;
     // algorithm attributes
@@ -368,6 +410,8 @@ struct CertCreator {
     const EVP_MD* sig = EVP_sha256();
     // special extensions
     std::vector<std::pair<std::string, std::string>> exts;
+
+    static int OBJ_SPvaCertStatusURI;
 
     std::tuple<owned_ptr<EVP_PKEY>, owned_ptr<X509>> create()
     {
@@ -446,6 +490,10 @@ struct CertCreator {
 
         if(extended_key_usage)
             add_extension(cert.get(), NID_ext_key_usage, extended_key_usage);
+
+        if(!cert_status_pv.empty()) {
+            add_extension(cert.get(), CertStatusPV.ext_nid, cert_status_pv.c_str());
+        }
 
         for(const auto& pair : exts) {
             owned_ptr<ASN1_OBJECT> id(OBJ_txt2obj(pair.first.c_str(), 1));
@@ -604,6 +652,7 @@ int main(int argc, char *argv[])
                 cc.extended_key_usage = "clientAuth,serverAuth";
             cc.issuer = i_cert.get();
             cc.ikey = i_key.get();
+            cc.cert_status_pv = SB()<<"CSTAT:foo:"<<name;
 
             owned_ptr<X509> cert;
             owned_ptr<EVP_PKEY> key;
