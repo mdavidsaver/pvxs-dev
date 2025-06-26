@@ -465,10 +465,7 @@ Server::Pvt::Pvt(const Config &conf)
                  event_new(acceptor_loop.base, -1, EV_TIMEOUT, doBeaconsS, this))
     ,searchReply(0x10000)
     ,builtinsrc(StaticSource::build())
-    ,associatedClient(conf.associatedClient)
     ,state(Stopped)
-    ,self_cert_valid_until(__FILE__, __LINE__,
-                           event_new(acceptor_loop.base, -1, EV_TIMEOUT, doValidUntilS, this))
 {
     effective.expand();
 
@@ -664,34 +661,6 @@ Server::Pvt::Pvt(const Config &conf)
         sources[std::make_pair(-1, "__server")] = std::make_shared<ServerSource>(this);
         sources[std::make_pair(-1, "__builtin")] = builtinsrc.source();
     }
-
-#ifdef PVXS_ENABLE_OPENSSL
-    if(tls_context && !associatedClient) {
-        auto cconf(client::Config::fromEnv());
-        // TODO: translate compatible configuration.  (same as Server::clientConfig() ?)
-        associatedClient = cconf.build();
-    }
-
-    if(tls_context && !tls_context.cert_status_pv.empty()) {
-        self_cert_valid = false;
-        self_cert_status_sub = associatedClient.monitor(tls_context.cert_status_pv)
-                .event([this](client::Subscription&) {
-                // on client worker
-                acceptor_loop.dispatch([this](){
-                    // on server worker
-                    while(true) {
-                        try {
-                            auto up(self_cert_status_sub->pop());
-                            if(!up)
-                                break;
-                        } catch(std::exception& e) {
-                        }
-                    }
-                });
-        })
-                .exec();
-    }
-#endif
 }
 
 Server::Pvt::~Pvt()
@@ -749,13 +718,6 @@ void Server::Pvt::start()
 void Server::Pvt::stop()
 {
     log_debug_printf(serversetup, "Server Stopping\n%s", "");
-
-#ifdef PVXS_ENABLE_OPENSSL
-    {
-        auto junk(std::move(self_cert_status_sub));
-        // implicit cancel
-    }
-#endif
 
     // Stop sending Beacons
     state_t prev_state;
@@ -978,22 +940,6 @@ void Server::Pvt::doBeaconsS(evutil_socket_t fd, short evt, void *raw)
 {
     try {
         static_cast<Pvt*>(raw)->doBeacons(evt);
-    }catch(std::exception& e){
-        log_exc_printf(serverio, "Unhandled error in beacon timer callback: %s\n", e.what());
-    }
-}
-
-void Server::Pvt::doValidUntil()
-{
-    log_warn_printf(serverio, "Self certificate status validity lapsed%s", "\n");
-    self_cert_valid = false;
-    // TODO: notify of credential change
-}
-
-void Server::Pvt::doValidUntilS(evutil_socket_t fd, short evt, void *raw)
-{
-    try {
-        static_cast<Pvt*>(raw)->doValidUntil();
     }catch(std::exception& e){
         log_exc_printf(serverio, "Unhandled error in beacon timer callback: %s\n", e.what());
     }
