@@ -23,9 +23,12 @@
 #include <pvxs/version.h>
 #include <pvxs/util.h>
 #include <pvxs/data.h>
-#include <pvxs/client.h>
+#include <pvxs/netcommon.h>
 
 namespace pvxs {
+namespace client {
+struct Config;
+}
 namespace server {
 
 struct SharedPV;
@@ -176,11 +179,6 @@ struct PVXS_API Config : public impl::ConfigCommon {
 
     //! Server unique ID.  Only meaningful in readback via Server::config()
     ServerGUID guid{};
-
-    //! (optional) client context used when making x509 certificate status requests.
-    //! In not provided, then a new context is created if needed.
-    //! @since UNRELEASED
-    client::Context associatedClient;
 
 private:
     bool BE = EPICS_BYTE_ORDER==EPICS_ENDIAN_BIG;
