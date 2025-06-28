@@ -311,6 +311,8 @@ void testServerReconfig() {
 
 MAIN(testtls)
 {
+    logger_level_set("*", Level::Debug);
+    logger_config_env();
     testPlan(22);
     testSetup();
     logger_config_env();
