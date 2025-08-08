@@ -23,7 +23,6 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get -y install libreadline-dev libevent-dev cmake \
-         python3-sphinx python3-breathe inkscape \
          abi-dumper vtable-dumper abi-compliance-checker universal-ctags \
          gcovr jq
 
