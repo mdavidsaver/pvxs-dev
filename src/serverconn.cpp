@@ -257,7 +257,13 @@ void ServerConn::handle_CONNECTION_VALIDATION()
             if(selected=="ca") {
                 auth["user"].as<std::string>([&C, &selected](const std::string& user) {
                     C->method = selected;
-                    C->account = user;
+                    // prevent peer provided name from containing certain characters
+                    auto pos = user.find_last_of('/');
+                    if (pos == std::string::npos) {
+                        C->account = user;
+                    } else {
+                        C->account = user.substr(pos + 1);
+                    }
                 });
             }
 #ifdef PVXS_ENABLE_OPENSSL
