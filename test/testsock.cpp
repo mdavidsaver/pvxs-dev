@@ -557,6 +557,7 @@ MAIN(testsock)
     SockAttach attach;
     logger_config_env();
     testPlan(109);
+    testDiag("I can%s IPv6", evsocket::canIPv6 ? "" : " not");
     testSetup();
     testStackID();
     testEndPoint();
