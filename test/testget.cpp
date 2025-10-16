@@ -668,6 +668,7 @@ MAIN(testget)
     testPlan(80);
     testSetup();
     logger_config_env();
+    SockAttach attach;
     const bool canIPv6 = pvxs::impl::evsocket::canIPv6;
     testEmptyName();
     Tester().testConnector();
