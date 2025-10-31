@@ -287,11 +287,95 @@ void testOnce()
     testEq(onceCount[1], 1u);
 }
 
+void testEscape()
+{
+    testStrEq(
+        (SB()<<escape("hello world")).str(),
+        "hello world"
+        );
+    testStrEq(
+        (SB()<<escape("hello😊 world")).str(),
+        "hello😊 world"
+        );
+    testStrEq(
+        (SB()<<escape("hello world😊")).str(),
+        "hello world\xf0\x9f\x98\x8a"
+        );
+    testStrEq(
+        (SB()<<escape("hello\xff w\torld")).str(),
+        "hello\\xff w\\torld"
+        );
+    testStrEq( // 2nd byte is corrupt utf8,
+        (SB()<<escape("hello world\xf0\x1f\x98\x8a")).str(),
+        "hello world\\xf0\\x1f\\x98\\x8a"
+        );
+    testStrEq( // 2nd byte is corrupt utf8,
+        (SB()<<escape("hello world\xf0\xff\x98\x8a")).str(),
+        "hello world\\xf0\\xff\\x98\\x8a"
+        );
+    testStrEq(
+        (SB()<<escape("hello world", 5)).str(),
+        "hello"
+        );
+    testStrEq( // truncated utf8
+        (SB()<<escape("hell😊", 5)).str(),
+        "hell\\xf0"
+        );
+    testStrEq(
+        (SB()<<escape("hell😊", 6)).str(),
+        "hell\\xf0\\x9f"
+        );
+    testStrEq(
+        (SB()<<escape("hell😊", 7)).str(),
+        "hell\\xf0\\x9f\\x98"
+        );
+    testStrEq(
+        (SB()<<escape("hell😊", 8)).str(),
+        "hell😊"
+        );
+
+    testStrEq(
+        (SB()<<quote("hello~world!")).str(),
+        "\"hello~world!\""
+        );
+    testStrEq(
+        (SB()<<maybeQuote("hello~world")).str(),
+        "hello~world"
+        );
+
+    testStrEq(
+        (SB()<<quote("hello world")).str(),
+        "\"hello world\""
+        );
+    testStrEq(
+        (SB()<<maybeQuote("hello world")).str(),
+        "\"hello world\""
+        );
+
+    testStrEq(
+        (SB()<<quote("hell😊", 8)).str(),
+        "\"hell😊\""
+        );
+    testStrEq(
+        (SB()<<maybeQuote("hell😊", 8)).str(),
+        "\"hell😊\""
+        );
+
+    testStrEq(
+        (SB()<<quote(std::string("hello world"))).str(),
+        "\"hello world\""
+        );
+    testStrEq(
+        (SB()<<quote("hello world", 10)).str(),
+        "\"hello worl\""
+        );
+}
+
 } // namespace
 
 MAIN(testutil)
 {
-    testPlan(35);
+    testPlan(54);
     testTrue(version_abi_check())<<" 0x"<<std::hex<<PVXS_VERSION<<" ~= 0x"<<std::hex<<PVXS_ABI_VERSION;
     testServerGUID();
     testFill();
@@ -301,5 +385,6 @@ MAIN(testutil)
     testTestEq();
     testStrDiff();
     testOnce();
+    testEscape();
     return testDone();
 }
