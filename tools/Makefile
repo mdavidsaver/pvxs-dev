@@ -11,6 +11,7 @@ USR_CPPFLAGS += -I$(TOP)/src
 PROD_LIBS += pvxs Com
 
 PROD_SRCS += cliutil.cpp
+PROD_SRCS += ntxcli.cpp
 
 PROD += pvxvct
 pvxvct_SRCS += pvxvct.cpp
