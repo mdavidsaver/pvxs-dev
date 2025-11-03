@@ -9,9 +9,13 @@
 
 #include <vector>
 #include <string>
+#include <iosfwd>
 #include <stdexcept>
 #include <map> // for std::pair
 
+#include <epicsTime.h>
+
+#include <pvxs/data.h>
 #include <utilpvt.h>
 
 namespace pvxs {
@@ -52,6 +56,19 @@ struct GetOpt {
     std::vector<std::pair<char, ArgVal>> arguments;
     bool success = false;
 };
+
+struct NTXCLI {
+    std::string name;
+    const Value& value;
+    epicsTimeStamp reftime;
+    Value::Fmt::format_t format = Value::Fmt::Delta;
+    uint64_t arrLimit = uint64_t(-1);
+
+    explicit
+    NTXCLI(const Value& value) :value(value) {}
+};
+
+std::ostream& operator<<(std::ostream& strm, const NTXCLI& ntx);
 
 } // namespace pvxs
 
