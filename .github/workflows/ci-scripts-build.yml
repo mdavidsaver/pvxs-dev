@@ -146,6 +146,19 @@ jobs:
             extra: "CMD_CXXFLAGS=-analyze"
 
     steps:
+    - name: ipconfig
+      if: runner.os == 'Windows'
+      run: |
+        ipconfig
+        route print
+    - name: "ip addr"
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        set -x
+        ip link
+        ip addr
+        ip route
     - uses: actions/checkout@v4
       with:
         submodules: true
