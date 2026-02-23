@@ -5,6 +5,7 @@
  */
 
 #include <atomic>
+#include <fstream>
 
 #include <stdio.h>
 #include <string.h>
@@ -17,10 +18,14 @@
 #include <epicsExit.h>
 #include <asTrapWrite.h>
 #include <generalTimeSup.h>
+#include <iocsh.h>
 
 #include "dblocker.h"
 #include "testioc.h"
 #include "utilpvt.h"
+
+// define printf macro after __attribute__ in event2.h
+#include <epicsStdio.h>
 
 #if EPICS_VERSION_INT >= VERSION_INT(3, 15, 0, 2)
 #  define HAVE_lsi
@@ -906,11 +911,110 @@ void testMonitorDBE(TestClient& ctxt)
     testEq(val["value"].as<int32_t>(), 43);
 }
 
+struct CaptureStd
+{
+    std::shared_ptr<FILE> m_out, m_err;
+
+    CaptureStd()
+    :m_out(fopen("testiocsh.out", "w+b"),
+                [](FILE* fp){
+                    (void)fclose(fp);
+                })
+    ,m_err(fopen("testiocsh.err", "w+b"),
+              [](FILE* fp){
+                  (void)fclose(fp);
+              })
+    {
+        if(!m_out || !m_err)
+            testAbort("Unable to open/create testiocsh.out / .err");
+        epicsSetThreadStdout(m_out.get());
+        epicsSetThreadStderr(m_err.get());
+    }
+    ~CaptureStd() {
+        epicsSetThreadStdout(nullptr);
+        epicsSetThreadStderr(nullptr);
+    }
+
+    std::string readf(FILE* fp) const {
+        testEq(fflush(fp), 0)<<" "<<errno;
+        testEq(fseek(fp, 0, SEEK_END), 0)<<" "<<errno;
+        size_t len = ftell(fp);
+        std::vector<char> cbuf(len);
+        testEq(fseek(fp, 0, SEEK_SET), 0)<<" "<<errno;
+        auto n = fread(cbuf.data(), 1, len, fp);
+        if(n<0 || n!=len) {
+            auto err = errno;
+            testTrue(false)<<" Unable to fread "
+                            <<n<<" "<<len<<" "<<err<<" "<<ferror(fp)<<" "<<feof(fp);
+        }
+        testEq(fseek(fp, 0, SEEK_END), 0)<<" "<<errno;
+        return std::string(cbuf.data(), cbuf.size());
+    }
+    std::string out() const {
+        return readf(m_out.get());
+    }
+    std::string err() const {
+        return readf(m_err.get());
+    }
+};
+
+void testiocsh(TestClient& ctxt)
+{
+    testDiag("%s", __func__);
+
+    TestSubscription sub(ctxt.monitor("test:ai")
+                             .maskConnected(true)
+                             .maskDisconnected(true));
+
+    auto val(sub.waitForUpdate());
+
+    {
+        CaptureStd cap;
+        iocshCmd("pvxsr 5");
+        auto out(cap.out());
+        auto err(cap.err());
+        testStrEq(err, "");
+        testStrMatch(".*EPICS_PVAS_AUTO_BEACON_ADDR_LIST=NO.*", out);
+        testStrMatch(".*Source: __server.*", out);
+        testStrMatch(".*test:nsec.*", out);
+        testStrMatch(".*State: Running TCP_Port:.*", out);
+        testStrMatch(".*test:ai TX=.*", out);
+    }
+    {
+        CaptureStd cap;
+        iocshCmd("pvxsi");
+        auto out(cap.out());
+        auto err(cap.err());
+        testStrEq(err, "");
+        testStrMatch(".*Toolchain.*", out);
+        testStrMatch(".*epicsThreadGetCPUs.*", out);
+        testStrMatch(".*EPICS_PVAS_AUTO_BEACON_ADDR_LIST=.*", out);
+    }
+    {
+        CaptureStd cap;
+        iocshCmd("pvxrefshow");
+        iocshCmd("pvxrefsave");
+        iocshCmd("pvxrefdiff");
+        auto out(cap.out());
+        auto err(cap.err());
+        testStrEq(err, "");
+        testStrMatch(".*StructTop.*", out);
+    }
+    {
+        CaptureStd cap;
+        iocshCmd("pvxsl 5");
+        auto out(cap.out());
+        auto err(cap.err());
+        testStrEq(err, "");
+        testStrMatch(".*RECORDS.*test:ai.*", out);
+    }
+}
+
 } // namespace
 
 MAIN(testqsingle)
 {
-    testPlan(95);
+    testPlan(141);
     testSetup();
     pvxs::logger_config_env();
     generalTimeRegisterCurrentProvider("test", 1, &testTimeCurrent);
@@ -954,6 +1058,7 @@ MAIN(testqsingle)
             testMonitorBO(mctxt);
             testMonitorAIFilt(mctxt);
             testMonitorDBE(mctxt);
+            testiocsh(mctxt);
         }
         timeSim = false;
         testPutBlock();
