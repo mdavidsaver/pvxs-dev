@@ -147,8 +147,10 @@ testCase& testCase::setPassMatch(const std::string& expr, const std::string& inp
 {
 #ifdef USE_POSIX_REGEX
     regex_t ex{};
+    fprintf(stderr, "%s(\"%s\", \"%s\")", __func__, expr.c_str(), inp.c_str());
 
     if(auto err = regcomp(&ex, expr.c_str(), REG_EXTENDED|REG_NOSUB)) {
+        fprintf(stderr, "%s(\"%s\", \"%s\") oops!", __func__, expr.c_str(), inp.c_str());
         auto len = regerror(err, &ex, nullptr, 0u);
         std::vector<char> msg(len+1);
         (void)regerror(err, &ex, msg.data(), len);
@@ -157,6 +159,7 @@ testCase& testCase::setPassMatch(const std::string& expr, const std::string& inp
         (*this)<<" expression error: "<<msg.data()<<" :";
 
     } else {
+        fprintf(stderr, "%s(\"%s\", \"%s\") ok", __func__, expr.c_str(), inp.c_str());
         setPass(regexec(&ex, inp.c_str(), 0, nullptr, 0)!=REG_NOMATCH);
         regfree(&ex);
     }
