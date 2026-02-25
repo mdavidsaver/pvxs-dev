@@ -945,48 +945,58 @@ void testMonitorDBE(TestClient& ctxt)
 
 struct CaptureStd
 {
-    std::shared_ptr<FILE> m_out, m_err;
+    std::string m_out, m_err;
 
-    CaptureStd()
-    :m_out(fopen("testiocsh.out", "w+b"),
+    static
+        std::string readFile(const std::string& filename)
+    {
+        std::ifstream t(filename.c_str());
+        std::stringstream buffer;
+
+        if (!t.is_open()) {
+            throw std::invalid_argument("Could not open filename " + filename);
+        }
+
+        buffer << t.rdbuf();
+        return buffer.str();
+    }
+
+    template<typename Fn>
+    CaptureStd(Fn&& fn) {
+        std::shared_ptr<FILE>
+            out(fopen("testiocsh.out", "w+b"),
+                                  [](FILE* fp){
+                                      (void)fclose(fp);
+                                  }),
+            err(fopen("testiocsh.err", "w+b"),
                 [](FILE* fp){
                     (void)fclose(fp);
-                })
-    ,m_err(fopen("testiocsh.err", "w+b"),
-              [](FILE* fp){
-                  (void)fclose(fp);
-              })
-    {
-        if(!m_out || !m_err)
+                });
+
+        if(!out || !err)
             testAbort("Unable to open/create testiocsh.out / .err");
-        epicsSetThreadStdout(m_out.get());
-        epicsSetThreadStderr(m_err.get());
-    }
-    ~CaptureStd() {
-        epicsSetThreadStdout(nullptr);
-        epicsSetThreadStderr(nullptr);
+        epicsSetThreadStdout(out.get());
+        epicsSetThreadStderr(err.get());
+
+        try {
+            fn();
+        }catch(...){
+            epicsSetThreadStdout(nullptr);
+            epicsSetThreadStderr(nullptr);
+            throw;
+        }
+        out.reset();
+        err.reset();
+
+        m_out = readFile("testiocsh.out");
+        m_err = readFile("testiocsh.err");
     }
 
-    std::string readf(FILE* fp) const {
-        testEq(fflush(fp), 0)<<" "<<errno;
-        testEq(fseek(fp, 0, SEEK_END), 0)<<" "<<errno;
-        size_t len = ftell(fp);
-        std::vector<char> cbuf(len);
-        testEq(fseek(fp, 0, SEEK_SET), 0)<<" "<<errno;
-        auto n = fread(cbuf.data(), 1, len, fp);
-        if(n<0 || n!=len) {
-            auto err = errno;
-            testTrue(false)<<" Unable to fread "
-                            <<n<<" "<<len<<" "<<err<<" "<<ferror(fp)<<" "<<feof(fp);
-        }
-        testEq(fseek(fp, 0, SEEK_END), 0)<<" "<<errno;
-        return std::string(cbuf.data(), cbuf.size());
+    const std::string& out() const {
+        return m_out;
     }
-    std::string out() const {
-        return readf(m_out.get());
-    }
-    std::string err() const {
-        return readf(m_err.get());
+    const std::string& err() const {
+        return m_err;
     }
 };
 
@@ -1001,44 +1011,40 @@ void testiocsh(TestClient& ctxt)
     auto val(sub.waitForUpdate());
 
     {
-        CaptureStd cap;
-        iocshCmd("pvxsr 5");
-        auto out(cap.out());
-        auto err(cap.err());
-        testStrEq(err, "");
-        testStrMatch(".*EPICS_PVAS_AUTO_BEACON_ADDR_LIST=NO.*", out);
-        testStrMatch(".*Source: __server.*", out);
-        testStrMatch(".*test:nsec.*", out);
-        testStrMatch(".*State: Running TCP_Port:.*", out);
-        testStrMatch(".*test:ai TX=.*", out);
+        CaptureStd cap([](){
+            iocshCmd("pvxsr 5");
+        });
+        testStrEq(cap.err(), "");
+        testStrMatch(".*EPICS_PVAS_AUTO_BEACON_ADDR_LIST=NO.*", cap.out());
+        testStrMatch(".*Source: __server.*", cap.out());
+        testStrMatch(".*test:nsec.*", cap.out());
+        testStrMatch(".*State: Running TCP_Port:.*", cap.out());
+        testStrMatch(".*test:ai TX=.*", cap.out());
     }
     {
-        CaptureStd cap;
-        iocshCmd("pvxsi");
-        auto out(cap.out());
-        auto err(cap.err());
-        testStrEq(err, "");
-        testStrMatch(".*Toolchain.*", out);
-        testStrMatch(".*epicsThreadGetCPUs.*", out);
-        testStrMatch(".*EPICS_PVAS_AUTO_BEACON_ADDR_LIST=.*", out);
+        CaptureStd cap([](){
+            iocshCmd("pvxsi");
+        });
+        testStrEq(cap.err(), "");
+        testStrMatch(".*Toolchain.*", cap.out());
+        testStrMatch(".*epicsThreadGetCPUs.*", cap.out());
+        testStrMatch(".*EPICS_PVAS_AUTO_BEACON_ADDR_LIST=.*", cap.out());
     }
     {
-        CaptureStd cap;
-        iocshCmd("pvxrefshow");
-        iocshCmd("pvxrefsave");
-        iocshCmd("pvxrefdiff");
-        auto out(cap.out());
-        auto err(cap.err());
-        testStrEq(err, "");
-        testStrMatch(".*StructTop.*", out);
+        CaptureStd cap([](){
+            iocshCmd("pvxrefshow");
+            iocshCmd("pvxrefsave");
+            iocshCmd("pvxrefdiff");
+        });
+        testStrEq(cap.err(), "");
+        testStrMatch(".*StructTop.*", cap.out());
     }
     {
-        CaptureStd cap;
-        iocshCmd("pvxsl 5");
-        auto out(cap.out());
-        auto err(cap.err());
-        testStrEq(err, "");
-        testStrMatch(".*RECORDS.*test:ai.*", out);
+        CaptureStd cap([](){
+            iocshCmd("pvxsl 5");
+        });
+        testStrEq(cap.err(), "");
+        testStrMatch(".*RECORDS.*test:ai.*", cap.out());
     }
 }
 
@@ -1046,7 +1052,7 @@ void testiocsh(TestClient& ctxt)
 
 MAIN(testqsingle)
 {
-    testPlan(143);
+    testPlan(111);
     testSetup();
     pvxs::logger_config_env();
     generalTimeRegisterCurrentProvider("test", 1, &testTimeCurrent);
