@@ -53,9 +53,12 @@ void subscriptionCallback(SingleSourceSubscriptionCtx* subscriptionContext,
         // We simply merge new field changes onto this value as events occur
         auto currentValue = subscriptionContext->currentValue;
 
-        {
+        bool lockit = !pDbFieldLog || !dbfl_has_copy(pDbFieldLog) || (change&UpdateType::Property);
+        if(lockit) {
             DBLocker F(dbChannelRecord(subscriptionContext->info->chan));
             // TODO MappingInfo::nsecMask
+            IOCSource::get(currentValue, MappingInfo(), Value(), change, pChannel, pDbFieldLog);
+        } else {
             IOCSource::get(currentValue, MappingInfo(), Value(), change, pChannel, pDbFieldLog);
         }
 
