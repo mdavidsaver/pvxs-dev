@@ -97,3 +97,4 @@ $(COMMON_DIR)/pvxsIoc.dbd: ../$(PVXS_DBD)
 
 pvxsIoc.dbd$(DEP):
 	echo "$(COMMONDEP_TARGET): ../Makefile" > $@
+	echo "$@: $(COMMON_DIR)/pvxsIoc.dbd" >> $@
