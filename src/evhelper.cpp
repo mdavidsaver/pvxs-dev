@@ -718,6 +718,7 @@ struct IfMapDaemon : private epicsThreadRunable {
     epicsMutex lock;
     epicsEvent wake;
     std::shared_ptr<const IfaceMap::Current> latest;
+    std::list<std::function<void(const IfaceMap::Current&)>> listeners;
     bool stop = false;
     epicsThread worker;
     IfMapDaemon()
@@ -750,6 +751,14 @@ struct IfMapDaemon : private epicsThreadRunable {
                     next = IfaceMap::refresh();
                     if(*latest==*next)
                         continue;
+
+                    for(auto& l : listeners) {
+                        try {
+                            l(*next); // next, previous
+                        } catch (std::exception& e) {
+                            log_exc_printf(logiface, "Unhandled exc %s : %s\n", typeid(e).name(), e.what());
+                        }
+                    }
                 }
                 log_warn_printf(logiface, "NIC configuration change detected %zu\n", next->byIndex.size());
                 latest.swap(next);
@@ -887,6 +896,25 @@ std::set<std::string> IfaceMap::all_external() const
     for(auto& pair : current->byIndex) {
         ret.emplace(pair.second.name);
     }
+    return ret;
+}
+
+struct IfaceMap::Changer {
+    decltype(IfMapDaemon::listeners)::const_iterator it;
+    ~Changer() {
+        Guard G(ifmapper->lock);
+        ifmapper->listeners.erase(it);
+    }
+};
+
+std::shared_ptr<IfaceMap::Changer>
+IfaceMap::onChange(std::function<void (const IfaceMap::Current &)> &&fn)
+{
+    auto ret(std::make_shared<Changer>());
+    threadOnce<&mapInit>();
+    assert(ifmapper);
+    Guard G(ifmapper->lock);
+    ret->it = ifmapper->listeners.insert(ifmapper->listeners.end(), std::move(fn));
     return ret;
 }
 
