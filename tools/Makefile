@@ -39,6 +39,10 @@ pvxlist_SRCS += list.cpp
 PROD += pvxmshim
 pvxmshim_SRCS += mshim.cpp
 
+
+PROD += put_pvxs
+put_pvxs_SRCS += put_pvxs.cpp
+
 # tests of CLI tools
 
 TESTPROD_HOST += testcliutil
