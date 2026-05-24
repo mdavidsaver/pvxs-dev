@@ -14,6 +14,10 @@
 
 #include <pvxs/log.h>
 #include "serverconn.h"
+#include "utilpvt.h"
+
+typedef epicsGuard<epicsMutex> Guard;
+typedef epicsGuardRelease<epicsMutex> UnGuard;
 
 // limit on size of TX buffer above which we suspend RX.
 // defined as multiple of OS socket TX buffer size
@@ -25,13 +29,45 @@ DEFINE_INST_COUNTER(ServerChannelControl);
 DEFINE_INST_COUNTER(ServerChan);
 DEFINE_INST_COUNTER(ServerConn);
 DEFINE_INST_COUNTER(ServerSource);
-}
+
+struct ClientCredentialsImpl final : public server::ClientCredentials {
+    mutable epicsMutex lock;
+    mutable std::shared_ptr<const std::set<std::string>> _roles;
+
+    ClientCredentialsImpl() = default;
+    explicit
+        ClientCredentialsImpl(const server::ClientCredentials& cc)
+        :server::ClientCredentials(cc)
+    {}
+    virtual ~ClientCredentialsImpl() {}
+    virtual std::shared_ptr<const std::set<std::string>> rolesConst() const override {
+        Guard G(lock);
+        auto ret(_roles);
+        if(!ret) {
+            {
+                UnGuard U(G);
+                auto scratch(std::make_shared<std::set<std::string>>());
+                osdGetRoles(account, *scratch);
+                ret = scratch;
+            }
+            _roles = ret;
+        }
+        return ret;
+    }
+};
+}// impl
+
+PeerCredentials::~PeerCredentials() {}
 
 std::set<std::string> PeerCredentials::roles() const
 {
-    std::set<std::string> ret;
-    osdGetRoles(account, ret);
-    return ret;
+    auto ret(rolesConst());
+    return *ret;
+}
+
+std::shared_ptr<const std::set<std::string> > PeerCredentials::rolesConst() const
+{
+    throw std::logic_error("Expected sub-class call");
 }
 
 std::ostream& operator<<(std::ostream& strm, const PeerCredentials& cred)
@@ -102,6 +138,8 @@ ServerConn::ServerConn(ServIface* iface, evutil_socket_t sock, struct sockaddr *
     }
 #endif
     {
+        // no benefit to alloc ClientCredentialsImpl
+        // as anonymous has no roles
         auto cred(std::make_shared<server::ClientCredentials>());
         cred->peer = peerName;
         cred->iface = iface->name;
@@ -251,7 +289,7 @@ void ServerConn::handle_CONNECTION_VALIDATION()
                        peerName.c_str(), selected.c_str(),
                        std::string(SB()<<auth).c_str());
 
-            auto C(std::make_shared<server::ClientCredentials>(*cred));
+            auto C(std::make_shared<ClientCredentialsImpl>(*cred));
             C->isTLS = iface->isTLS;
 
             if(selected=="ca") {

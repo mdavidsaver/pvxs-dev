@@ -32,6 +32,7 @@ namespace pvxs {
  * @since UNRELEASED
  */
 struct PVXS_API PeerCredentials {
+    virtual ~PeerCredentials();
     //! Peer address (eg. numeric IPv4)
     std::string peer;
     //! The local interface address (eg. numeric IPv4) through which this client is connected.
@@ -59,6 +60,11 @@ struct PVXS_API PeerCredentials {
      * On other targets, an empty list is returned.
      */
     std::set<std::string> roles() const;
+    /** Lookup (locally) roles associated with the account.
+     *
+     * \copydetails roles()
+     */
+    virtual std::shared_ptr<const std::set<std::string>> rolesConst() const;
 };
 
 PVXS_API
