@@ -7,11 +7,35 @@
 #include <pvxs/log.h>
 #include "clientimpl.h"
 
+typedef epicsGuard<epicsMutex> Guard;
+typedef epicsGuardRelease<epicsMutex> UnGuard;
+
 namespace pvxs {
 namespace client {
 
 DEFINE_LOGGER(io, "pvxs.client.io");
 DEFINE_LOGGER(remote, "pvxs.remote.log");
+
+struct ServerCredentialsImpl final : ServerCredentials {
+    mutable epicsMutex lock;
+    mutable std::shared_ptr<const std::set<std::string>> _roles;
+
+    virtual ~ServerCredentialsImpl() {}
+    virtual std::shared_ptr<const std::set<std::string>> rolesConst() const override {
+        Guard G(lock);
+        auto ret(_roles);
+        if(!ret) {
+            {
+                UnGuard U(G);
+                auto scratch(std::make_shared<std::set<std::string>>());
+                osdGetRoles(account, *scratch);
+                ret = scratch;
+            }
+            _roles = ret;
+        }
+        return ret;
+    }
+};
 
 Connection::Connection(const std::shared_ptr<ContextImpl>& context,
                        const SockAddr& peerAddr,
@@ -180,7 +204,7 @@ void Connection::bevEvent(short events)
         log_debug_printf(io, "Connected to %s\n", peerName.c_str());
         connTime = epicsTime::getCurrent();
 
-        auto peerCred(std::make_shared<ServerCredentials>());
+        auto peerCred(std::make_shared<ServerCredentialsImpl>());
         peerCred->peer = peerName;
         peerCred->isTLS = isTLS;
 
