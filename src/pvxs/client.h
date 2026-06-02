@@ -54,13 +54,17 @@ struct PVXS_API Finished : public Disconnect
     virtual ~Finished();
 };
 
-//! For monitor only.  Subscription has (re)connected.
+//! Indication of connection to a server
 struct PVXS_API Connected : public std::runtime_error
 {
     Connected(const std::string& peerName);
+    Connected(const std::string& peerName,
+              const epicsTime& time);
     virtual ~Connected();
 
+    //! Server IP address
     const std::string peerName;
+    //! Local time of connection
     const epicsTime time;
 };
 
@@ -925,7 +929,7 @@ class ConnectBuilder
     std::shared_ptr<Context::Pvt> ctx;
     std::string _pvname;
     std::string _server;
-    std::function<void()> _onConn;
+    std::function<void(const Connected&)> _onConn;
     std::function<void()> _onDis;
     bool _syncCancel = true;
 public:
@@ -936,7 +940,16 @@ public:
     {}
 
     //! Handler to be invoked when channel becomes connected.
-    ConnectBuilder& onConnect(std::function<void()>&& cb) { _onConn = std::move(cb); return *this; }
+    //! @since UNRELEASED
+    ConnectBuilder& onConnect(std::function<void(const Connected&)>&& cb)
+    { _onConn = std::move(cb); return *this; }
+    //! Handler to be invoked when channel becomes connected.
+    //! @since UNRELEASED Prefer void(const Connected&) in new code.
+    ConnectBuilder& onConnect(std::function<void()>&& cb)
+    {
+        _onConn = [cb](const Connected&) { cb(); };
+        return *this;
+    }
     //! Handler to be invoked when channel becomes disconnected.
     ConnectBuilder& onDisconnect(std::function<void()>&& cb) { _onDis = std::move(cb); return *this; }
 

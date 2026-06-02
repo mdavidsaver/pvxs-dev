@@ -88,10 +88,15 @@ RemoteError::~RemoteError() {}
 
 Finished::~Finished() {}
 
-Connected::Connected(const std::string& peerName)
+Connected::Connected(const std::string &peerName)
+    :Connected(peerName, epicsTime::getCurrent()) // legacy
+{}
+
+Connected::Connected(const std::string& peerName,
+                     const epicsTime& time)
     :std::runtime_error("Connected")
     ,peerName(peerName)
-    ,time(epicsTime::getCurrent())
+    ,time(time)
 {}
 
 Connected::~Connected() {}
@@ -274,10 +279,13 @@ std::shared_ptr<Connect> ConnectBuilder::exec()
         op->chan = Channel::build(context, op->_name, server);
 
         bool cur = op->_connected = op->chan->state==Channel::Active;
-        if(cur && op->_onConn)
-            op->_onConn();
-        else if(!cur && op->_onDis)
+        if(cur && op->_onConn) {
+            auto& conn = op->chan->conn;
+            Connected evt(conn->peerName, conn->connTime);
+            op->_onConn(evt);
+        } else if(!cur && op->_onDis) {
             op->_onDis();
+        }
 
         op->chan->connectors.push_back(op.get());
     });
