@@ -34,6 +34,7 @@ struct PVXS_API UDPManager
         std::string proto;
         SockAddr server;
         ServerGUID guid;
+        uint16_t beaconChange = 0;
         uint8_t peerVersion=0;
         Beacon(const SockAddr& src) :src(src) {}
     };

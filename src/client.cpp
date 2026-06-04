@@ -881,12 +881,16 @@ void ContextImpl::onBeacon(const UDPManager::Beacon& msg)
 
     auto& cur(it->second);
 
-    if(action==Update && (cur.guid!=msg.guid || cur.peerVersion!=msg.peerVersion)) {
+    if(action==Update && (
+            cur.guid!=msg.guid ||
+            cur.peerVersion!=msg.peerVersion ||
+            cur.beaconChange!=msg.beaconChange
+    )) {
         action = Change;
         log_debug_printf(beacon, "Update server %s\n",
                          std::string(SB()<<msg.src<<" : "<<msg.server<<'/'<<msg.proto
-                                     <<" "<<cur.guid<<'/'<<(unsigned)cur.peerVersion
-                                     <<" -> "<<msg.guid<<'/'<<(unsigned)msg.peerVersion).c_str());
+                                     <<" "<<cur.guid<<'/'<<(unsigned)cur.peerVersion<<'@'<<cur.beaconChange
+                                     <<" -> "<<msg.guid<<'/'<<(unsigned)msg.peerVersion<<'@'<<msg.beaconChange).c_str());
 
         serverEvent(Discovered{Discovered::Timeout,
                                cur.peerVersion,
@@ -900,6 +904,7 @@ void ContextImpl::onBeacon(const UDPManager::Beacon& msg)
 
     cur.guid = msg.guid;
     cur.peerVersion = msg.peerVersion;
+    cur.beaconChange = msg.beaconChange;
     cur.time = now;
     // don't trigger if sender changes as server configuration
     // could see beacons reach us from multiple interfaces.
@@ -909,7 +914,7 @@ void ContextImpl::onBeacon(const UDPManager::Beacon& msg)
         if(action==New)
             log_debug_printf(beacon, "New server %s\n",
                              std::string(SB()<<msg.src<<" : "<<msg.server<<'/'<<msg.proto
-                                         <<" "<<cur.guid<<'/'<<(unsigned)cur.peerVersion).c_str());
+                             <<" "<<cur.guid<<'/'<<(unsigned)cur.peerVersion<<'@'<<cur.beaconChange).c_str());
 
         serverEvent(Discovered{Discovered::Online,
                                msg.peerVersion,

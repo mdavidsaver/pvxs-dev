@@ -290,6 +290,7 @@ struct ContextImpl : public std::enable_shared_from_this<ContextImpl>
     struct BeaconInfo {
         SockAddr sender;
         ServerGUID guid{};
+        uint16_t beaconChange = 0;
         uint8_t peerVersion{};
         epicsTimeStamp time{};
     };
