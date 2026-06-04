@@ -478,7 +478,8 @@ void UDPCollector::process_one(const uint8_t *buf, size_t nrx, origin_t origin,
         uint16_t port = 0;
 
         _from_wire<12>(M, &beaconMsg.guid[0], false, __FILE__, __LINE__);
-        M.skip(4, __FILE__, __LINE__); // skip flags, seq, and change count.  unused
+        M.skip(2, __FILE__, __LINE__); // skip flags and seq.  unused
+        from_wire(M, beaconMsg.beaconChange);
         from_wire(M, beaconMsg.server);
         from_wire(M, port);
         if(beaconMsg.server.isAny()) {
