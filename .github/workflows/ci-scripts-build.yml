@@ -22,6 +22,7 @@ env:
   CMP: gcc
   _PVXS_ABORT_ON_CRIT: 1
   PVXS_LOG: pvxs.*=WARN
+  ASAN_OPTIONS: detect_leaks=0
   # test debugging logic in testtls
   SSLKEYLOGFILE: key.log
 
@@ -95,12 +96,15 @@ jobs:
             configuration: default
             base: "7.0"
 
-          - name: Native Linux with clang ubsan
+          - name: Native Linux with clang ubaddrsan
             os: ubuntu-latest
             cmp: clang
             configuration: default
             base: "7.0"
-            extra: "CMD_CFLAGS=-fsanitize=undefined CMD_CXXFLAGS=-fsanitize=undefined CMD_LDFLAGS=-fsanitize=undefined"
+            extra: "CMD_CFLAGS='-fsanitize=undefined -fsanitize=address'
+                    CMD_CXXFLAGS='-fsanitize=undefined -fsanitize=address'
+                    CMD_LDFLAGS='-fsanitize=undefined -fsanitize=address'
+                   "
 
           - name: Native Linux with libevent stable
             os: ubuntu-latest
