@@ -22,6 +22,7 @@ env:
   CMP: gcc
   _PVXS_ABORT_ON_CRIT: 1
   PVXS_LOG: pvxs.*=WARN
+  ASAN_OPTIONS: detect_leaks=0
   # test debugging logic in testtls
   SSLKEYLOGFILE: key.log
 
@@ -95,12 +96,15 @@ jobs:
             configuration: default
             base: "7.0"
 
-          - name: Native Linux with clang ubsan
+          - name: Native Linux with clang sanitize
             os: ubuntu-latest
             cmp: clang
             configuration: default
             base: "7.0"
-            extra: "CMD_CFLAGS=-fsanitize=undefined CMD_CXXFLAGS=-fsanitize=undefined CMD_LDFLAGS=-fsanitize=undefined"
+            extra: "CMD_CFLAGS='-fsanitize=undefined -fsanitize=address -fsanitize=thread'
+                    CMD_CXXFLAGS='-fsanitize=undefined -fsanitize=address -fsanitize=thread'
+                    CMD_LDFLAGS='-fsanitize=undefined -fsanitize=address -fsanitize=thread'
+                   "
 
           - name: Native Linux with libevent stable
             os: ubuntu-latest
@@ -204,21 +208,25 @@ jobs:
       if: ${{ matrix.base != '3.14' }}
       run: python .ci/cue.py --add-path "{TOP}/bin/{EPICS_HOST_ARCH}" --add-path "{TOP}/bundle/usr/{EPICS_HOST_ARCH}/lib" exec pvxinfo -D
     - name: Test env setup
-      run: echo "UBSAN_OPTIONS=log_path=$PWD/UBSAN:suppressions=$PWD/.ci-local/ubsan.supp:report_error_type=1:print_stacktrace=1" >> $GITHUB_ENV
+      run: |
+        cat <<EOF >> $GITHUB_ENV
+        UBSAN_OPTIONS=log_path=$PWD/UBSAN:suppressions=$PWD/.ci-local/ubsan.supp:report_error_type=1:print_stacktrace=1
+        TSAN_OPTIONS=log_path=$PWD/TSAN
+        EOF
     - name: Run main module tests
       run: python -m ci_core_dumper exec python .ci/cue.py -T 5M --add-path "{TOP}/bundle/usr/{EPICS_HOST_ARCH}/lib" test
     - name: Collect and show test results
       if: ${{ always() }}
       run: python .ci/cue.py test-results
-    - name: Show UBSAN logs
+    - name: Show sanitizer logs
       shell: bash
       if: ${{ always() }}
       run: |
         ret=0
-        for ff in `find . -name 'UBSAN*'`
+        for ff in `find . -name 'UBSAN*' -or -name 'TSAN*'`
         do
           echo "==== $ff ===="
-          cat "$ff"
+          cat -- "$ff"
           ret=1
         done
         exit $ret
