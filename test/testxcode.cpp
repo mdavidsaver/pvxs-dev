@@ -1195,6 +1195,18 @@ void testRegressDeepAny()
     testFalse(buf.good())<<" deeply-nested Any must fault, not recurse without bound";
 }
 
+void testMismatchNest()
+{
+    testDiag("%s", __func__);
+
+    std::vector<uint8_t> msg({0x88, 0x23}); // StructA with Int64 elements ?!?
+    TypeStore ctxt;
+    Value val;
+    FixedBuf buf(false, msg);
+    from_wire_type(buf, ctxt, val);
+    testFalse(buf.good());
+}
+
 // test the common case for a pvRequest of caching an empty Struct
 void testEmptyRequest()
 {
@@ -1368,7 +1380,7 @@ void testUserXCode()
 
 MAIN(testxcode)
 {
-    testPlan(173);
+    testPlan(174);
     testSetup();
     testDeserializeString();
     testSerialize1();
@@ -1385,6 +1397,7 @@ MAIN(testxcode)
     testRegressCNEN();
     testRegressBadBitMask();
     testRegressDeepAny();
+    testMismatchNest();
     testBadFieldName();
     testEmptyRequest();
     testPartialXCode();
