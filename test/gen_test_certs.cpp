@@ -13,10 +13,12 @@
 #include <type_traits>
 #include <vector>
 
+#include <openssl/evp.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/pkcs12.h>
+#include <openssl/ocsp.h>
 #include <openssl/stack.h>
 #include <openssl/err.h>
 
@@ -31,6 +33,7 @@ struct ssl_delete;
     struct ssl_delete<TYPE> { \
         inline void operator()(TYPE* fp) { if(fp) TYPE ## _free(fp); } \
     }
+DEFINE_DELETE(OSSL_LIB_CTX);
 DEFINE_DELETE(BIO);
 DEFINE_DELETE(ASN1_OBJECT);
 DEFINE_DELETE(ASN1_INTEGER);
@@ -46,11 +49,21 @@ DEFINE_DELETE(X509_NAME);
 DEFINE_DELETE(X509_PUBKEY);
 DEFINE_DELETE(X509_EXTENSION);
 DEFINE_DELETE(X509_ATTRIBUTE);
+DEFINE_DELETE(X509_STORE);
 DEFINE_DELETE(GENERAL_NAME);
 DEFINE_DELETE(GENERAL_NAMES);
+DEFINE_DELETE(OCSP_BASICRESP);
+DEFINE_DELETE(OCSP_RESPONSE);
+DEFINE_DELETE(OCSP_CERTID);
+DEFINE_DELETE(EVP_MD);
+DEFINE_DELETE(EVP_MD_CTX);
 template<>
 struct ssl_delete<FILE> {
     inline void operator()(FILE* fp) { if(fp) fclose(fp); }
+};
+template<>
+struct ssl_delete<unsigned char> {
+    inline void operator()(unsigned char *buf) { if(buf) OPENSSL_free(buf); }
 };
 #define DEFINE_SK_DELETE(TYPE) \
     template<> \
@@ -121,13 +134,13 @@ struct owned_ptr : public std::unique_ptr<T, ssl_delete<T>>
 };
 
 // many openssl calls return 1 (or sometimes zero) on success.
-void _must_equal(int expect, int actual, const char *expr)
+void _must_equal(int line, int expect, int actual, const char *expr)
 {
     if(expect!=actual)
-        throw SSLError(SB()<<expect<<"!="<<actual<<" : "<<expr);
+        throw SSLError(SB()<<line<<": "<<expect<<"!="<<actual<<" : "<<expr);
 }
 #define _STR(STR) #STR
-#define MUST(EXPECT, ...) _must_equal(EXPECT, __VA_ARGS__, _STR(__VA_ARGS__))
+#define MUST(EXPECT, ...) _must_equal(__LINE__, EXPECT, __VA_ARGS__, _STR(__VA_ARGS__))
 
 #ifdef NID_oracle_jdk_trustedkeyusage
 // OpenSSL 3.2 will add the ability to set the Java specific trustedkeyusage bag attribute
@@ -205,8 +218,33 @@ void add_extension(X509* cert, int nid, const char *expr,
     MUST(1, X509_add_ext(cert, ext.get(), -1));
 }
 
+struct OSSLCtx {
+    // thread safety not needed here
+    static
+    owned_ptr<OSSL_LIB_CTX> libctx;
+
+    OSSLCtx()
+    {
+        if(libctx)
+            return;
+        owned_ptr<OSSL_LIB_CTX> ctx(OSSL_LIB_CTX_new());
+        auto err = CONF_modules_load_file_ex(
+            ctx.get(), NULL, "pvxs",
+            // use default "openssl_conf" key if "pvxs = section" not present
+            CONF_MFLAGS_DEFAULT_SECTION
+                // silent if file does not exist
+                |CONF_MFLAGS_IGNORE_MISSING_FILE);
+        if(err <= 0) {
+            std::cerr<<"Warning: "<<SSLError("openssl configuration").what()<<std::endl;
+        }
+        libctx = std::move(ctx);
+    }
+};
+
+owned_ptr<OSSL_LIB_CTX> OSSLCtx::libctx;
+
 // for writing a PKCS#12 files, right?
-struct PKCS12Writer {
+struct PKCS12Writer final : OSSLCtx {
     const std::string& outdir;
     const char* friendlyName = nullptr;
     EVP_PKEY* key = nullptr;
@@ -226,13 +264,13 @@ struct PKCS12Writer {
                                                 cert,
                                                 cacerts.get(),
                                                 0, 0, 0, 0, 0,
-                                                nullptr, nullptr,
+                                                libctx.get(), "",
                                                 &jdk_trust, nullptr));
 
 
         owned_ptr<BIO> fp(BIO_new(BIO_s_file()));
 
-        std::string outpath(SB()<<outdir<<fname);
+        std::string outpath(SB()<<outdir<<fname<<".p12");
         if(BIO_write_filename(fp.get(), (void*)outpath.c_str())<=0)
             throw SSLError(SB()<<"BIO_write_filename() : "<<outpath);
 
@@ -240,7 +278,98 @@ struct PKCS12Writer {
     }
 };
 
-struct CertCreator {
+struct OCSPWriter final : OSSLCtx {
+    const std::string& outdir;
+    const char *md = "SHA2-256";
+    unsigned expire_days = 365*10;
+    X509* ca = nullptr;
+    X509* cert = nullptr;
+    X509* issuer = nullptr;
+    EVP_PKEY *skey = nullptr;
+    X509* signer = nullptr;
+    owned_ptr<STACK_OF(X509)> certs;
+
+    OCSPWriter(const std::string& outdir)
+        :outdir(outdir)
+        ,certs(sk_X509_new_null())
+    {}
+
+    void write(const char* fname) const {
+        owned_ptr<OCSP_BASICRESP> rep(OCSP_BASICRESP_new());
+
+        owned_ptr<EVP_MD> digest(EVP_MD_fetch(libctx.get(), md, "?provider=tpm2"));
+
+        owned_ptr<OCSP_CERTID> certid(OCSP_cert_to_id(digest.get(), cert, issuer));
+
+        owned_ptr<ASN1_TIME> now(X509_gmtime_adj(NULL, 0)),
+                            next(X509_gmtime_adj(NULL, expire_days*24*60*60));
+        // not revoking...
+        int revreason = OCSP_REVOKED_STATUS_NOSTATUS;
+        ASN1_TIME *revtime = nullptr;
+        auto sign = OCSP_basic_add1_status(rep.get(), certid.get(), V_OCSP_CERTSTATUS_GOOD,
+                                           revreason, revtime, now.get(), next.get());
+        if(!sign)
+            throw SSLError("OCSP_basic_add1_status");
+
+        // OCSP_NOCERTS - response assumed signed by issuer, so all necessary
+        //                certs included in regular verification chain.
+        if(!OCSP_basic_sign(rep.get(), signer, skey, digest.get(), certs.get(), OCSP_NOCERTS))
+            throw SSLError("OCSP_basic_sign_ctx");
+
+        owned_ptr<OCSP_RESPONSE> resp(OCSP_response_create(OCSP_RESPONSE_STATUS_SUCCESSFUL,
+                                                           rep.get()));
+
+        owned_ptr<unsigned char> buf;
+        auto buflen = i2d_OCSP_RESPONSE(resp.get(), buf.acquire());
+        if(buflen<=0)
+            throw SSLError("i2d_OCSP_RESPONSE");
+
+        std::string outpath(SB()<<outdir<<fname<<".ocsp");
+        std::unique_ptr<FILE, ssl_delete<FILE>> out(fopen(outpath.c_str(), "wb"));
+        if(!out) {
+            auto err = errno;
+            throw std::runtime_error(SB()<<"Error opening for write : "<<outpath<<" : "<<strerror(err));
+        }
+
+        MUST(buflen, fwrite(buf.get(), 1, buflen, out.get()));
+
+        // test validation...
+        {
+            owned_ptr<STACK_OF(X509)> untrusted(sk_X509_new_null());
+            owned_ptr<X509_STORE> trusted(X509_STORE_new());
+            MUST(1, X509_STORE_add_cert(trusted.get(), ca));
+            MUST(1, sk_X509_push(untrusted.get(), signer));
+            MUST(1, OCSP_basic_verify(rep.get(), untrusted.get(), trusted.get(), 0));
+            // so the OCSP response is valid.
+            // does it attest this cert?
+
+            bool found = false;
+            for(int i=0, N=OCSP_resp_count(rep.get()); i<N; i++) {
+                auto resp = OCSP_resp_get0(rep.get(), i);
+                auto cand = OCSP_SINGLERESP_get0_id(resp);
+
+                // need to find which digest algo. to use.
+                const ASN1_OBJECT *md_algo = nullptr;
+                OCSP_id_get0_info(nullptr, const_cast<ASN1_OBJECT**>(&md_algo),
+                                  nullptr, nullptr, const_cast<OCSP_CERTID*>(cand));
+
+                auto algo = EVP_get_digestbyobj(md_algo);
+
+                owned_ptr<OCSP_CERTID> cid(OCSP_cert_to_id(algo, cert, issuer));
+
+                if(OCSP_id_cmp(cand, cid.get())==0) {
+                    if(found)
+                        throw std::logic_error("more than one matching reply in OCSP response?!?");
+                    found = true;
+                }
+            }
+            if(!found)
+                throw std::logic_error("No matching reply in OCSP reponse");
+        }
+    }
+};
+
+struct CertCreator final : OSSLCtx {
     // commonName string
     const char *CN = nullptr;
     // NULL for self-signed
@@ -256,23 +385,26 @@ struct CertCreator {
     // Cert. Authority
     bool isCA = false;
     // algorithm attributes
-    int keytype = EVP_PKEY_RSA;
     size_t keylen = 2048;
-    const EVP_MD* sig = EVP_sha256();
+    const char* sig = "SHA2-256";
+    // special extensions
+    std::vector<std::pair<std::string, std::string>> exts;
 
     std::tuple<owned_ptr<EVP_PKEY>, owned_ptr<X509>> create()
     {
         // generate public/private key pair
         owned_ptr<EVP_PKEY> key;
         {
-            owned_ptr<EVP_PKEY_CTX> kctx(EVP_PKEY_CTX_new_id(keytype, NULL));
+            owned_ptr<EVP_PKEY_CTX> kctx(EVP_PKEY_CTX_new_from_name(libctx.get(),
+                                                                    "RSA",
+                                                                    "?provider=tpm2"));
             MUST(1, EVP_PKEY_keygen_init(kctx.get()));
             MUST(1, EVP_PKEY_CTX_set_rsa_keygen_bits(kctx.get(), keylen));
             MUST(1, EVP_PKEY_keygen(kctx.get(), key.acquire()));
         }
 
         // start assembling certificate
-        owned_ptr<X509> cert(X509_new());
+        owned_ptr<X509> cert(X509_new_ex(libctx.get(), "?provider=tpm2"));
         MUST(1, X509_set_version(cert.get(), 2));
 
         MUST(1, X509_set_pubkey(cert.get(), key.get()));
@@ -338,7 +470,20 @@ struct CertCreator {
         if(extended_key_usage)
             add_extension(cert.get(), NID_ext_key_usage, extended_key_usage);
 
-        auto nbytes(X509_sign(cert.get(), ikey, sig));
+        for(const auto& pair : exts) {
+            owned_ptr<ASN1_OBJECT> id(OBJ_txt2obj(pair.first.c_str(), 1));
+            owned_ptr<ASN1_OCTET_STRING> val(ASN1_OCTET_STRING_new());
+            ASN1_OCTET_STRING_set(val.get(),
+                                  reinterpret_cast<const unsigned char*>(pair.second.c_str()),
+                                  pair.second.size());
+            owned_ptr<X509_EXTENSION> ext(X509_EXTENSION_create_by_OBJ(nullptr, id.get(), 0, val.get()));
+
+            MUST(1, X509_add_ext(cert.get(), ext.get(), -1));
+        }
+
+        owned_ptr<EVP_MD> digest(EVP_MD_fetch(libctx.get(), sig, "?provider=tpm2"));
+
+        auto nbytes(X509_sign(cert.get(), ikey, digest.get()));
         if(nbytes==0)
             throw SSLError("Failed to sign cert");
 
@@ -400,13 +545,16 @@ int main(int argc, char *argv[])
             cc.serial = serial++;
             cc.isCA = true;
             cc.key_usage = "cRLSign,keyCertSign";
+            // not useful, just testing...
+            cc.exts.push_back(std::make_pair("1.3.6.1.4.1.20566.42.42",
+                                             std::string("hello\0 world",12)));
 
             std::tie(root_key, root_cert) = cc.create();
 
             PKCS12Writer p12(outdir);
             p12.friendlyName = cc.CN;
             MUST(1, sk_X509_push(p12.cacerts.get(), root_cert.get()));
-            p12.write("ca.p12");
+            p12.write("ca");
             // not saving rootCA key
         }
 
@@ -429,7 +577,7 @@ int main(int argc, char *argv[])
             p12.key = key.get();
             p12.cert = cert.get();
             MUST(1, sk_X509_push(p12.cacerts.get(), root_cert.get()));
-            p12.write("superserver1.p12");
+            p12.write("superserver1");
         }
 
         // a chain/intermediate certificate authority
@@ -453,7 +601,14 @@ int main(int argc, char *argv[])
             p12.key = i_key.get();
             p12.cert = i_cert.get();
             MUST(1, sk_X509_push(p12.cacerts.get(), root_cert.get()));
-            p12.write("intermediateCA.p12");
+            p12.write("intermediateCA");
+
+            OCSPWriter ocsp(outdir);
+            ocsp.cert = i_cert.get();
+            ocsp.signer = ocsp.issuer = ocsp.ca = root_cert.get();
+            ocsp.skey = root_key.get();
+            ocsp.write("intermediateCA");
+            // openssl ocsp -respin intermediateCA.ocsp -text -issuer ca.p12
         }
 
         // from this point, the rootCA key is no longer needed.
@@ -485,13 +640,19 @@ int main(int argc, char *argv[])
             p12.cert = cert.get();
             MUST(1, sk_X509_push(p12.cacerts.get(), i_cert.get()));
             MUST(2, sk_X509_push(p12.cacerts.get(), root_cert.get()));
-            std::string fname(SB()<<name<<".p12");
 
             const char *pw = "";
             if(strcmp(name, "client2")==0)
                 pw = "oraclesucks"; // java keytool forces non-interactive IOCs to deal with passwords...
 
-            p12.write(fname.c_str(), pw);
+            p12.write(name, pw);
+
+            OCSPWriter ocsp(outdir);
+            ocsp.ca = root_cert.get();
+            ocsp.cert = cert.get();
+            ocsp.signer = ocsp.issuer = i_cert.get();
+            ocsp.skey = i_key.get();
+            ocsp.write(name);
         }
 
         return 0;
