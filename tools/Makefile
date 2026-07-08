@@ -39,6 +39,10 @@ pvxlist_SRCS += list.cpp
 PROD += pvxmshim
 pvxmshim_SRCS += mshim.cpp
 
+ifeq (YES,$(EVENT2_HAS_OPENSSL))
+PROD += pvx12
+pvx12_SRCS += p12.cpp
+endif
 
 PROD += put_pvxs
 put_pvxs_SRCS += put_pvxs.cpp
