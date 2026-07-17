@@ -238,27 +238,6 @@ void split_into(std::vector<std::string>& out, const std::string& inp)
     removeDups(out);
 }
 
-void split_addr_into(const char* name, std::vector<std::string>& out, const std::string& inp,
-                     const impl::ConfigCommon* conf, uint16_t defaultPort, bool required=false)
-{
-    std::vector<std::string> raw;
-    split_into(raw, inp);
-
-    // parse, resolve host names, then re-print.
-    // Catch syntax errors early, and normalize prior to removing duplicates
-    for(auto& temp : raw) {
-        try {
-            SockEndpoint ep(temp, conf, defaultPort);
-            out.push_back(SB()<<ep);
-
-        } catch(std::exception& e){
-            if(required)
-                throw std::runtime_error(SB()<<"invalid endpoint \""<<temp<<"\" "<<e.what());
-            log_err_printf(config, "%s ignoring invalid '%s' : %s\n", name, temp.c_str(), e.what());
-        }
-    }
-}
-
 std::string join_addr(const std::vector<std::string>& in)
 {
     std::ostringstream strm;
@@ -529,18 +508,15 @@ void _fromDefs(Config& self, const std::map<std::string, std::string>& defs, boo
     }
 
     if(pickone({"EPICS_PVAS_INTF_ADDR_LIST"})) {
-        split_addr_into(pickone.name.c_str(), self.interfaces, pickone.val,
-                        nullptr, self.tcp_port, true);
+        split_into(self.interfaces, pickone.val);
     }
 
     if(pickone({"EPICS_PVAS_IGNORE_ADDR_LIST"})) {
-        split_addr_into(pickone.name.c_str(), self.ignoreAddrs, pickone.val,
-                        nullptr, 0, true);
+        split_into(self.ignoreAddrs, pickone.val);
     }
 
     if(pickone({"EPICS_PVAS_BEACON_ADDR_LIST", "EPICS_PVA_ADDR_LIST"})) {
-        split_addr_into(pickone.name.c_str(), self.beaconDestinations, pickone.val,
-                        nullptr, self.udp_port);
+        split_into(self.beaconDestinations, pickone.val);
     }
 
     if(pickone({"EPICS_PVAS_AUTO_BEACON_ADDR_LIST", "EPICS_PVA_AUTO_ADDR_LIST"})) {
@@ -704,13 +680,11 @@ void _fromDefs(Config& self, const std::map<std::string, std::string>& defs, boo
     }
 
     if(pickone({"EPICS_PVA_ADDR_LIST"})) {
-        split_addr_into(pickone.name.c_str(), self.addressList, pickone.val,
-                        nullptr, self.udp_port);
+        split_into(self.addressList, pickone.val);
     }
 
     if(pickone({"EPICS_PVA_NAME_SERVERS"})) {
-        split_addr_into(pickone.name.c_str(), self.nameServers, pickone.val,
-                        &self, 0);
+        split_into(self.nameServers, pickone.val);
     }
 
     if(pickone({"EPICS_PVA_AUTO_ADDR_LIST"})) {
@@ -718,8 +692,7 @@ void _fromDefs(Config& self, const std::map<std::string, std::string>& defs, boo
     }
 
     if(pickone({"EPICS_PVA_INTF_ADDR_LIST"})) {
-        split_addr_into(pickone.name.c_str(), self.interfaces, pickone.val,
-                        nullptr, 0);
+        split_into(self.interfaces, pickone.val);
     }
 
     if(pickone({"EPICS_PVA_CONN_TMO"})) {
