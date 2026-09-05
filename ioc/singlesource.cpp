@@ -434,6 +434,11 @@ void SingleSource::onCreate(std::unique_ptr<server::ChannelControl>&& channelCon
         return;
     }
 
+    if(dbValueSize(dbChannelFinalFieldType(pDbChannel))==0
+        || dbChannelFinalElements(pDbChannel)==0
+        || dbChannelFinalFieldSize(pDbChannel)==0)
+        throw std::runtime_error(SB()<<"Inaccessible dbChannel");
+
     log_debug_printf(_logname, "Accepting channel for '%s'\n", sourceName);
 
     auto sInfo(std::make_shared<SingleInfo>(std::move(pDbChannel)));
