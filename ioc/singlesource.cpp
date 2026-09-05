@@ -197,7 +197,9 @@ Value getValuePrototype(const std::shared_ptr<SingleInfo>& sinfo) {
     bool control = true;
     bool valueAlarm = true;
 
-    if (dbrType == DBR_ENUM) {
+    if (!valueType.valid()) {
+        throw std::runtime_error(SB()<<"Unsupported DBR "<<dbrType);
+    } else if (dbrType == DBR_ENUM) {
         valuePrototype = nt::NTEnum{}.create();
     } else {
         valuePrototype = nt::NTScalar{ valueType, display, control, valueAlarm, true }.create();
