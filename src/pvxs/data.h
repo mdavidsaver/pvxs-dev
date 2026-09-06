@@ -192,7 +192,7 @@ struct TypeCode {
     //! the actual type code.  eg. for switch()
     code_t code;
 
-    bool valid() const;
+    PVXS_API bool valid() const;
 
     Kind    kind() const  { return Kind(code&0xe0); }
     //! size()==1<<order()
