@@ -295,7 +295,7 @@ struct ContextImpl : public std::enable_shared_from_this<ContextImpl>
     // Channels where we are waiting for a search response
     std::vector<std::list<std::weak_ptr<Channel>>> searchBuckets;
 
-    std::list<std::unique_ptr<UDPListener> > beaconRx;
+    std::set<std::unique_ptr<UDPListener> > beaconRx;
 
     std::map<uint32_t, std::weak_ptr<Channel>> chanByCID;
     // strong ref. loop through Channel::context
