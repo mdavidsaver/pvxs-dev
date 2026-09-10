@@ -34,6 +34,8 @@ using ptr_set = std::set<T, std::owner_less<T>>;
 
 struct SharedPV::Impl : public std::enable_shared_from_this<Impl>
 {
+    // Lock order: this -> Source locks
+    // lock taken from Server worker thread, so must not sync. from another thread while held
     mutable epicsMutex lock;
 
     std::function<void(SharedPV&, std::unique_ptr<ExecOp>&&, Value&&)> onPut;
@@ -51,11 +53,12 @@ struct SharedPV::Impl : public std::enable_shared_from_this<Impl>
 
     INST_COUNTER(SharedPVImpl);
 
+    // caller must not hold lock
     static
     void connectOp(const std::shared_ptr<Impl>& self, const std::shared_ptr<ConnectOp>& conn, const Value& current)
     {
         try{
-            // unlocked as connect() will sync. with the client worker
+            // unlocked as connect() will sync. with the server worker
             conn->connect(current);
         }catch(std::exception& e){
             log_warn_printf(logshared, "%s Client %s: Can't attach() get: %s\n",
@@ -78,7 +81,7 @@ struct SharedPV::Impl : public std::enable_shared_from_this<Impl>
             {
                 UnGuard U(G);
 
-                // unlock as connect() and onClose() sync. with the client worker
+                // unlock as connect() and onClose() sync. with the server worker
                 sub = conn->connect(current);
 
                 conn->onClose([self, sub](const std::string& msg) {
