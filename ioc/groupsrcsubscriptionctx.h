@@ -10,8 +10,9 @@
 #ifndef PVXS_GROUPSRCSUBSCRIPTIONCTX_H
 #define PVXS_GROUPSRCSUBSCRIPTIONCTX_H
 
+#include <atomic>
 #include <map>
-#include <vector>
+#include <list>
 
 #include <pvxs/source.h>
 
@@ -28,7 +29,7 @@ class GroupSourceSubscriptionCtx {
 public:
     Group& group;
     epicsMutex eventLock{};
-    bool eventsPrimed = false, firstEvent = true;
+    std::atomic<bool> eventsPrimed{false}, firstEvent{true};
     bool eventsEnabled = false;
     std::unique_ptr<server::MonitorControlOp> subscriptionControl{};
     INST_COUNTER(GroupSourceSubscriptionCtx);
@@ -38,7 +39,7 @@ public:
     Value currentValue;
 
     // must db_cancel_event() before ~MonitorControlOp
-    std::vector<FieldSubscriptionCtx> fieldSubscriptionContexts{};
+    std::list<FieldSubscriptionCtx> fieldSubscriptionContexts{};
     explicit GroupSourceSubscriptionCtx(Group& subscribedGroup)
             :group(subscribedGroup), currentValue(subscribedGroup.valueTemplate.cloneEmpty()) {
     }

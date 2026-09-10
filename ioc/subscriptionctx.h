@@ -10,6 +10,7 @@
 #ifndef PVXS_SUBSCRIPTIONCTX_H
 #define PVXS_SUBSCRIPTIONCTX_H
 
+#include <atomic>
 #include <memory>
 #include <stdexcept>
 #include <type_traits>
@@ -71,8 +72,8 @@ public:
 // For locking access to subscription context
     Subscription pValueEventSubscription;
     Subscription pPropertiesEventSubscription;
-    bool hadValueEvent = false;
-    bool hadPropertyEvent = false;
+    std::atomic<bool> hadValueEvent{false};
+    std::atomic<bool> hadPropertyEvent{false};
     void cancel() {
         pValueEventSubscription.cancel();
         pPropertiesEventSubscription.cancel();
