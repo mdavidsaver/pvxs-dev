@@ -162,6 +162,14 @@ struct PVXS_API SockEndpoint {
     explicit SockEndpoint(const SockAddr& addr) :addr(addr) {}
 
     MCastMembership resolve() const;
+
+    bool operator<(const SockEndpoint& o) const {
+        auto d = addr.compare(o.addr);
+        if(d!=0) {
+            return d<0;
+        }
+        return ttl < o.ttl || iface < o.iface || scheme < o.scheme;
+    }
 };
 
 PVXS_API

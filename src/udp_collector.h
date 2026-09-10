@@ -115,6 +115,10 @@ public:
 
     void start(bool s=true);
     inline void stop() { start(false); }
+
+    bool operator<(const UDPListener& o) const {
+        return dest < o.dest;
+    }
 };
 
 }} // namespace pvxs::impl
