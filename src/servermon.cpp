@@ -444,8 +444,10 @@ struct ServerMonitorSetup : public server::MonitorSetupOp
         if(!serv)
             return;
         serv->acceptor_loop.call([this, &fn](){
-            if(auto oper = op.lock())
-                oper->onClose = std::move(fn);
+            if(auto oper = op.lock()) {
+                if(oper->state != ServerOp::Dead)
+                    oper->onClose = std::move(fn);
+            }
         });
     }
 
