@@ -374,7 +374,7 @@ std::ostream& operator<<(std::ostream& strm, const Server& serv)
 #undef CASE
             }
             if(!serv.pvt->interfaces.empty()) {
-                auto& first = serv.pvt->interfaces.front();
+                auto& first = *serv.pvt->interfaces.begin();
                 strm<<" TCP_Port: "<<first.bind_addr.port();
             }
             if(auto evmethod = event_base_get_method(serv.pvt->acceptor_loop.base)) {
@@ -508,7 +508,7 @@ Server::Pvt::Pvt(const Config &conf)
 
         addr.addr.setPort(effective.udp_port);
 
-        listeners.push_back(manager.onSearch(addr, cb));
+        listeners.insert(manager.onSearch(addr, cb));
 
         // update to allow udp_port==0
         effective.udp_port = addr.addr.port();
@@ -521,7 +521,7 @@ Server::Pvt::Pvt(const Config &conf)
         if(addr.addr.family()==AF_INET && !addr.addr.isAny() && !addr.addr.isMCast()) {
             for(auto bcast : dummy.broadcasts(&addr.addr)) {
                 bcast.setPort(addr.addr.port());
-                listeners.push_back(manager.onSearch(bcast, cb));
+                listeners.insert(manager.onSearch(bcast, cb));
             }
         }
     }
@@ -571,10 +571,10 @@ Server::Pvt::Pvt(const Config &conf)
             if(addr.port()==0)
                 addr.setPort(effective.tcp_port);
 
-            interfaces.emplace_back(addr, this, firstiface, false);
+            auto p = interfaces.emplace(addr, this, firstiface, false);
 
             if(firstiface || effective.tcp_port==0)
-                effective.tcp_port = interfaces.back().bind_addr.port();
+                effective.tcp_port = p.first->bind_addr.port();
             firstiface = false;
         }
 
@@ -585,10 +585,10 @@ Server::Pvt::Pvt(const Config &conf)
                 // unconditionally set port to avoid clash with plain TCP listener
                 addr.setPort(effective.tls_port);
 
-                interfaces.emplace_back(addr, this, firstiface, true);
+                auto pt = interfaces.emplace(addr, this, firstiface, true);
 
                 if(firstiface || effective.tls_port==0)
-                    effective.tls_port = interfaces.back().bind_addr.port();
+                    effective.tls_port = pt.first->bind_addr.port();
                 firstiface = false;
             }
         }

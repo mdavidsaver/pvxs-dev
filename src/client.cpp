@@ -714,7 +714,7 @@ ContextImpl::ContextImpl(const Config& conf, const evbase& tcp_loop)
 
     for(auto& iface : effective.interfaces) {
         SockEndpoint addr(iface.c_str(), nullptr, effective.udp_port);
-        beaconRx.push_back(manager.onBeacon(addr, cb));
+        beaconRx.insert(manager.onBeacon(addr, cb));
         log_info_printf(io, "Listening for beacons on %s\n", addr.addr.tostring().c_str());
 
         if(addr.addr.family()==AF_INET && addr.addr.isAny()) {
@@ -722,7 +722,7 @@ ContextImpl::ContextImpl(const Config& conf, const evbase& tcp_loop)
             auto any6(addr);
             any6.addr = SockAddr::any(AF_INET6);
 
-            beaconRx.push_back(manager.onBeacon(any6, cb));
+            beaconRx.insert(manager.onBeacon(any6, cb));
         }
     }
 

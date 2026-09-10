@@ -192,6 +192,7 @@ struct ServIface
     server::Server::Pvt * const server;
     const bool isTLS;
 
+    // const after ctor
     SockAddr bind_addr;
     std::string name;
 
@@ -201,6 +202,10 @@ struct ServIface
     ServIface(const SockAddr &addr, server::Server::Pvt *server, bool fallback, bool isTLS);
 
     static void onConnS(struct evconnlistener *listener, evutil_socket_t sock, struct sockaddr *peer, int socklen, void *raw);
+
+    bool operator<(const ServIface& o) const {
+        return bind_addr < o.bind_addr;
+    }
 };
 
 
@@ -247,12 +252,12 @@ struct Server::Pvt
     // accept new connections and send beacons
     evbase acceptor_loop;
 
-    std::list<std::unique_ptr<UDPListener> > listeners;
+    std::set<std::unique_ptr<UDPListener> > listeners;
     // destination address, and whether last sendto() succeeded
     std::vector<std::pair<SockEndpoint, bool>> beaconDest;
     std::vector<SockAddr> ignoreList;
 
-    std::list<ServIface> interfaces;
+    std::set<ServIface> interfaces;
     std::map<ServerConn*, std::shared_ptr<ServerConn> > connections;
 
     evsocket beaconSender4, beaconSender6;
