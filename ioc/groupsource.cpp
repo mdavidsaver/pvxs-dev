@@ -406,7 +406,6 @@ void GroupSource::onSubscribe(const std::shared_ptr<GroupSourceSubscriptionCtx>&
 
     // Initialise the field subscription contexts.  One for each group field.
     // This is stored in the group context
-    groupSubscriptionCtx->fieldSubscriptionContexts.reserve(groupSubscriptionCtx->group.fields.size());
     for (auto& field: groupSubscriptionCtx->group.fields) {
         groupSubscriptionCtx->fieldSubscriptionContexts.emplace_back(field, groupSubscriptionCtx.get());
         auto& fieldSubscriptionContext = groupSubscriptionCtx->fieldSubscriptionContexts.back();
