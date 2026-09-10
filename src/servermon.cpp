@@ -379,7 +379,7 @@ struct ServerMonitorControl : public server::MonitorControlOp
 };
 DEFINE_INST_COUNTER(ServerMonitorControl);
 
-struct ServerMonitorSetup : public server::MonitorSetupOp
+struct ServerMonitorSetup final : public server::MonitorSetupOp
 {
     ServerMonitorSetup(ServerConn* conn,
                      const std::weak_ptr<server::Server::Pvt>& server,

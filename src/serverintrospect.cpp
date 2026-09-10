@@ -58,7 +58,7 @@ struct ServerIntrospect final : public ServerOp
 };
 DEFINE_INST_COUNTER(ServerIntrospect);
 
-struct ServerIntrospectControl : public server::ConnectOp
+struct ServerIntrospectControl final : public server::ConnectOp
 {
     ServerIntrospectControl(ServerConn *conn, ServerChan *chan,
                             const std::weak_ptr<server::Server::Pvt>& server,
