@@ -293,7 +293,8 @@ struct GPROp : public OperationBase
 
             builder_busy = true;
             try {
-                temp = builder(std::move(temp));
+                if(builder)
+                    temp = builder(std::move(temp));
                 state = GPROp::Exec;
 
             } catch(std::exception& e) {
