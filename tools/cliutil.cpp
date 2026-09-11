@@ -59,9 +59,8 @@ GetOpt::GetOpt(int argc, char *argv[], const char *spec)
                             // continue scanning for more flags.  eg. "-vv"
                             goto nextchar;
                         }
-                    } else {
-                        if(s[1]==':')
-                            s++;
+                    } else if(s[1]==':') {
+                        s++;
                     }
                 }
                 // unrecognized
