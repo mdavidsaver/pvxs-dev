@@ -25,7 +25,7 @@ namespace {
 
 void usage(const char* argv0)
 {
-    std::cerr<<"Usage: "<<argv0<<" <opts> [pvname ...]\n"
+    std::cerr<<"Usage: "<<argv0<<" [opts] [pvname ...]\n"
                "\n"
                "  -h        Show this message.\n"
                "  -V        Print version and exit.\n"
