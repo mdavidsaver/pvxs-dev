@@ -49,7 +49,7 @@ struct test_print<std::pair<char, ArgVal>> {
 }} // namespace::detail
 
 MAIN(testcliutil) {
-    testPlan(24);
+    testPlan(30);
 
     {
         testDiag("case @%d", __LINE__);
@@ -75,7 +75,7 @@ MAIN(testcliutil) {
 
     {
         testDiag("case @%d", __LINE__);
-        const char* argv[] = {"exe", "-v", "hello", "-aAa"};
+        const char* argv[] = {"exe", "-v", "-aAa", "hello"};
         pvxs::GetOpt opts(NELEMENTS(argv), const_cast<char**>(argv), "va:");
         testOk(strcmp(opts.argv0, "exe")==0, "%s", opts.argv0);
         decltype (opts.arguments) arguments({{'v', nullptr}, {'a',"Aa"}});
@@ -86,12 +86,12 @@ MAIN(testcliutil) {
 
     {
         testDiag("case @%d", __LINE__);
-        const char* argv[] = {"exe", "-v", "hello", "-a"}; // missing value
+        const char* argv[] = {"exe", "-v", "-a"}; // missing value
         pvxs::GetOpt opts(NELEMENTS(argv), const_cast<char**>(argv), "va:");
         testOk(strcmp(opts.argv0, "exe")==0, "%s", opts.argv0);
         decltype (opts.arguments) arguments({{'v', nullptr}, {'?',nullptr}});
         testArrEq(opts.arguments, arguments);
-        decltype (opts.positional) positional({"hello"});
+        decltype (opts.positional) positional;
         testArrEq(opts.positional, positional);
     }
 
@@ -136,6 +136,28 @@ MAIN(testcliutil) {
         decltype (opts.arguments) arguments({{-1, "--vvQQ"}});
         testArrEq(opts.arguments, arguments);
         decltype (opts.positional) positional({"hello"});
+        testArrEq(opts.positional, positional);
+    }
+
+    {
+        testDiag("case @%d", __LINE__);
+        const char* argv[] = {"exe", "-v", "-1", "hello"};
+        pvxs::GetOpt opts(NELEMENTS(argv), const_cast<char**>(argv), "va:");
+        testOk(strcmp(opts.argv0, "exe")==0, "%s", opts.argv0);
+        decltype (opts.arguments) arguments({{'v', nullptr}, {-1, nullptr}});
+        testArrEq(opts.arguments, arguments);
+        decltype (opts.positional) positional({"hello"});
+        testArrEq(opts.positional, positional);
+    }
+
+    {
+        testDiag("case @%d", __LINE__);
+        const char* argv[] = {"exe", "-v", "hello", "-1"};
+        pvxs::GetOpt opts(NELEMENTS(argv), const_cast<char**>(argv), "va:");
+        testOk(strcmp(opts.argv0, "exe")==0, "%s", opts.argv0);
+        decltype (opts.arguments) arguments({{'v', nullptr}});
+        testArrEq(opts.arguments, arguments);
+        decltype (opts.positional) positional({"hello", "-1"});
         testArrEq(opts.positional, positional);
     }
 

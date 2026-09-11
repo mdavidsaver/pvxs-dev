@@ -75,6 +75,8 @@ nextarg:
 
         } else {
             positional.push_back(arg);
+            // replicate POSIXLY_CORRECT= behavior.  Require options before positional.
+            allpos = true;
         }
         success = true;
     }
