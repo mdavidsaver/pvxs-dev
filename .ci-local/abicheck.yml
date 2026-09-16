@@ -1,0 +1,3 @@
+compile:
+  defines:
+    - PVXS_ENABLE_EXPERT_API
