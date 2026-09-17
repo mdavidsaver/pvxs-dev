@@ -22,6 +22,21 @@ CONFIGS += $(subst ../,,$(wildcard $(CONFIG_INSTALLS)))
 
 CFG += CONFIG_PVXS_VERSION
 
+_LIBEVENT_BUNDLE_LIBS += event_core
+
+ifeq (WIN32,$(OS_CLASS))
+_LIBEVENT_SYS_LIBS += bcrypt iphlpapi netapi32 ws2_32
+else
+_LIBEVENT_BUNDLE_LIBS += event_pthreads
+endif
+
+# at this point we have included the generated O.$(T_A)/TOOLCHAIN
+# and use this to generated CONFIG_PVXS_MODULE
+
+ifdef T_A
+CFG += TOOLCHAIN_PVXS.$(T_A)
+endif
+
 include $(TOP)/configure/RULES
 
 ifdef T_A
@@ -30,5 +45,13 @@ install: TOOLCHAIN
 TOOLCHAIN: toolchain.c
 	$(CPP) $(CPPFLAGS) $(INCLUDES) ../toolchain.c > $@.tmp
 	$(MV) $@.tmp $@
+
+EXPAND_ARGS = -a $(T_A) -t "$(INSTALL_LOCATION)"
+EXPAND_ARGS += "-DLIBEVENT=$(LIBEVENT)"
+EXPAND_ARGS += "-DLIBEVENT_BUNDLE_LIBS=$(_LIBEVENT_BUNDLE_LIBS)"
+EXPAND_ARGS += "-DLIBEVENT_SYS_LIBS=$(_LIBEVENT_SYS_LIBS)"
+
+TOOLCHAIN_PVXS.$(T_A): ../TOOLCHAIN_PVXS.target@ TOOLCHAIN
+	$(EXPAND_TOOL) $(EXPAND_ARGS) $< $@
 
 endif
