@@ -46,6 +46,8 @@ TOOLCHAIN: toolchain.c
 	$(CPP) $(CPPFLAGS) $(INCLUDES) ../toolchain.c > $@.tmp
 	$(MV) $@.tmp $@
 
+include TOOLCHAIN
+
 EXPAND_ARGS = -a $(T_A) -t "$(INSTALL_LOCATION)"
 EXPAND_ARGS += "-DLIBEVENT=$(LIBEVENT)"
 EXPAND_ARGS += "-DLIBEVENT_BUNDLE_LIBS=$(_LIBEVENT_BUNDLE_LIBS)"
