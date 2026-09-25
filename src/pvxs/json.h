@@ -53,7 +53,7 @@ namespace json {
  *  top.from("42");
  *  @endcode
  *
- *  @since UNRELEASED
+ *  @since 1.5.3
  */
 struct Parse {
 private:

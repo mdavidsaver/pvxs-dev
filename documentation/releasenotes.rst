@@ -3,8 +3,8 @@
 Release Notes
 =============
 
-1.5.3 (UNRELEASED)
-------------------
+1.5.3 (Sept 2026)
+-----------------
 
 - `Value` field traverse syntax change.
   When starting from a Union, a leading "->" to be omitted.
