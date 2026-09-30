@@ -553,6 +553,7 @@ Server::Pvt::Pvt(const Config &conf)
         // don't re-select if original was random
         next.udp_port = effective.udp_port;
         next.tcp_port = effective.tcp_port;
+        next.tls_port = effective.tls_port;
         next.expand();
     });
 }
