@@ -1,0 +1,107 @@
+name: Bug report
+description: Create a report to help us improve
+title: 'Bug:'
+labels: ["bug"]
+type: bug
+assignees:
+- mdavidsaver
+body:
+- type: textarea
+  attributes:
+    label: Describe the bug
+    description: A clear and concise description of the undesired or unexpected behavior.
+
+- type: textarea
+  attributes:
+    label: To Reproduce
+    description: |
+        Steps to reproduce the behavior:
+        Whenever practical, please include a precise sequence of commands to aid the maintainer in reproducing the reported misbehavior.
+        Begin with a fresh clone from https://github.com/epics-base/pvxs .
+    render: bash
+    value: |
+      # Setup environment
+      git clone https://github.com/epics-base/epics-base.git
+      make -C epics-base -j2
+      git clone https://github.com/epics-base/pvxs.git
+      echo 'EPICS_BASE=$(TOP)/../epics-base' > pvxs/configure/RELEASE.local
+      make -C pvxs -j2
+      # ... cause misbehavior
+
+
+- type: textarea
+  attributes:
+    label: Expected behavior
+    description: |
+        A clear and concise description of what you expected to happen.
+        Please include any/all error messages seen, exactly as seen.
+        If an error message is long, then please place the content into a file and [attach it](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/attaching-files) to your comment.
+
+- type: markdown
+  attributes:
+    value: "Information (please complete the following)"
+
+- type: textarea
+  attributes:
+    label: Build information
+    description: From a successful build, include the output of `pvxinfo -D`.
+
+- type: markdown
+  attributes:
+    value: "Please fill in the following with information not captured above."
+
+- type: input
+  attributes:
+    label: "PVXS Version or Git commit ID"
+    description: "eg. run `git log -n1`"
+    placeholder: 1.2.3
+
+- type: input
+  attributes:
+    label: "EPICS Base Version or Git commit ID"
+    description: "eg. run `git log -n1`"
+    placeholder: 7.0.0
+
+- type: input
+  attributes:
+    label: "libevent Version"
+    placeholder: 2.1.0
+
+- type: input
+  attributes:
+    label: EPICS_HOST_ARCH
+    description: EPICS build host architecture.
+    placeholder: linux-x86_64
+
+- type: input
+  attributes:
+    label: EPICS Target Arch.
+    description: EPICS target architecture.  If different than host arch.
+    placeholder: linux-x86_64
+
+- type: input
+  attributes:
+    label: Host OS version
+    placeholder: Debian Linux 10
+
+- type: input
+  attributes:
+    label: Target OS version
+    placeholder: Debian Linux 10
+
+- type: input
+  attributes:
+    label: Compiler version
+    placeholder: GCC 4.3.2
+
+- type: textarea
+  attributes:
+    label: Network configuration
+    description: |
+        Values of any `$EPICS_PVA*` environment variables.
+        Mention if host(s) have more than one network interface, or on different subnets.
+
+- type: textarea
+  attributes:
+    label: Additional context
+    description: Add any other context about the problem here.
