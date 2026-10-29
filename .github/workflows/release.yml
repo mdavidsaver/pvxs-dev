@@ -94,7 +94,10 @@ jobs:
 
     - name: abicheck dump current
       run: |
+        cp .ci-local/abicheck.yml /tmp/abicheck.yml
+
         abicheck dump \
+        --config /tmp/abicheck.yml \
         lib/linux-*/libpvxs.so.* \
         -I${HOME}/.cache/base-7.0/include \
         -I${HOME}/.cache/base-7.0/include/os/Linux \
@@ -103,6 +106,7 @@ jobs:
         > /tmp/pvxs-CUR.json
 
         abicheck dump \
+        --config /tmp/abicheck.yml \
         lib/linux-*/libpvxsIoc.so.* \
         -I${HOME}/.cache/base-7.0/include \
         -I${HOME}/.cache/base-7.0/include/os/Linux \
@@ -129,6 +133,7 @@ jobs:
     - name: abicheck dump previous
       run: |
         abicheck dump \
+        --config /tmp/abicheck.yml \
         lib/linux-*/libpvxs.so.* \
         -I${HOME}/.cache/base-7.0/include \
         -I${HOME}/.cache/base-7.0/include/os/Linux \
@@ -137,6 +142,7 @@ jobs:
         > /tmp/pvxs-PREV.json
 
         abicheck dump \
+        --config /tmp/abicheck.yml \
         lib/linux-*/libpvxsIoc.so.* \
         -I${HOME}/.cache/base-7.0/include \
         -I${HOME}/.cache/base-7.0/include/os/Linux \
